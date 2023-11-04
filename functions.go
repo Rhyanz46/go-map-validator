@@ -27,6 +27,15 @@ func IsIPv4PrefixValid(prefix string) (res bool) {
 	return
 }
 
+func IsEmail(email string) bool {
+	ok := strings.Contains(email, "@")
+	if !ok {
+		return false
+	}
+	ok = strings.Contains(strings.Split(email, "@")[1], ".")
+	return ok
+}
+
 func IsIPv4Valid(ip string) bool {
 	parsedIP := net.ParseIP(ip)
 	return parsedIP != nil && parsedIP.To4() != nil
@@ -82,7 +91,7 @@ func Validate(field string, dataTemp map[string]interface{}, validator RequestDa
 		return nil, errors.New("you need to input data in '" + field + "' field")
 	}
 
-	if !validator.UUID && !validator.IPV4 && dataType != validator.Type && !validator.UUIDToString && !validator.IPv4OptionalPrefix {
+	if !validator.UUID && !validator.IPV4 && dataType != validator.Type && !validator.UUIDToString && !validator.IPv4OptionalPrefix && !validator.Email {
 		return nil, errors.New("the field '" + field + "' should be '" + validator.Type.String() + "'")
 	}
 
@@ -104,6 +113,12 @@ func Validate(field string, dataTemp map[string]interface{}, validator RequestDa
 			return stringUuid, nil
 		}
 		return dataUuid, nil
+	}
+
+	if validator.Email {
+		if reflect.TypeOf(data).Kind() != reflect.String || !IsEmail(data.(string)) {
+			return nil, errors.New("field " + field + " is not valid email")
+		}
 	}
 
 	if validator.IPV4 {

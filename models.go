@@ -8,6 +8,7 @@ type RequestDataValidator struct {
 	IsMapInterface bool
 	//Enum           []interface{} willl support soon
 	Type               reflect.Kind
+	Email              bool
 	Max                *int
 	Min                *int
 	IfNull             interface{}
