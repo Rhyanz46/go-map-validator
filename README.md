@@ -4,7 +4,7 @@
 ### Gin Framework
 ```go
 type MessageResponse struct {
-	Message string `json:"message"`
+    Message string `json:"message"`
 }
 
 func Create(c *gin.Context){
