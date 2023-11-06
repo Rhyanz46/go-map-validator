@@ -55,3 +55,7 @@ type dataState struct {
 type finalOperation struct {
 	*dataState
 }
+
+type extraOperation struct {
+	*finalOperation
+}

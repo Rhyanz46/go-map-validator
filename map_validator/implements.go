@@ -71,12 +71,42 @@ func (state *dataState) LoadFormHttp(r *http.Request) (*finalOperation, error) {
 	return &finalOperation{state}, nil
 }
 
-func (state *finalOperation) RunValidate() error {
+func (state *finalOperation) RunValidate() (*extraOperation, error) {
 	for key, validationData := range state.rules {
 		_, err := validate(key, state.data, validationData)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
+	return &extraOperation{state}, nil
+}
+
+func (state *extraOperation) Bind(i interface{}) error {
+	val := reflect.ValueOf(i)
+	if val.Kind() != reflect.Ptr || val.Elem().Kind() != reflect.Struct {
+		panic("need struct pointer!")
+	}
+
+	el := val.Elem()
+	t := val.Elem().Type()
+
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		tag := field.Tag.Get("map_validator")
+
+		if tag == "" || !field.IsExported() {
+			continue
+		}
+
+		if field.Type.Kind() == reflect.TypeOf(state.data[tag]).Kind() &&
+			field.Type.Kind() != reflect.Interface &&
+			field.Type.Kind() != reflect.Struct {
+			err := convertValue(state.data[tag], field.Type.Kind(), el.Field(i))
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }

@@ -305,3 +305,110 @@ func ToInterfaceSlice(slice interface{}) []interface{} {
 
 	return ret
 }
+
+func convertValue(newValue interface{}, kind reflect.Kind, data reflect.Value) error {
+	errNotSupport := errors.New("not support data")
+	switch kind {
+	case reflect.Int:
+		converted, ok := newValue.(float64)
+		if !ok {
+			return errNotSupport
+		}
+		data.SetInt(int64(converted))
+	case reflect.Int8:
+		converted, ok := newValue.(int64)
+		if !ok {
+			return errNotSupport
+		}
+		data.SetInt(converted)
+	case reflect.Int16:
+		converted, ok := newValue.(int64)
+		if !ok {
+			return errNotSupport
+		}
+		data.SetInt(converted)
+	case reflect.Int32:
+		converted, ok := newValue.(int64)
+		if !ok {
+			return errNotSupport
+		}
+		data.SetInt(converted)
+	case reflect.Int64:
+		converted, ok := newValue.(int64)
+		if !ok {
+			return errNotSupport
+		}
+		data.SetInt(converted)
+	case reflect.Uint:
+		converted, ok := newValue.(float64)
+		if !ok {
+			return errNotSupport
+		}
+		data.SetUint(uint64(converted))
+	case reflect.Uint8:
+		converted, ok := newValue.(float64)
+		if !ok {
+			return errNotSupport
+		}
+		data.SetUint(uint64(converted))
+	case reflect.Uint16:
+		converted, ok := newValue.(float64)
+		if !ok {
+			return errNotSupport
+		}
+		data.SetUint(uint64(converted))
+	case reflect.Uint32:
+		converted, ok := newValue.(float64)
+		if !ok {
+			return errNotSupport
+		}
+		data.SetUint(uint64(converted))
+	case reflect.Uint64:
+		converted, ok := newValue.(float64)
+		if !ok {
+			return errNotSupport
+		}
+		data.SetUint(uint64(converted))
+	case reflect.Float32:
+		converted, ok := newValue.(float64)
+		if !ok {
+			return errNotSupport
+		}
+		data.SetFloat(float64(converted))
+	case reflect.Float64:
+		converted, ok := newValue.(float64)
+		if !ok {
+			return errNotSupport
+		}
+		data.SetFloat(converted)
+	case reflect.String:
+		converted, ok := newValue.(string)
+		if !ok {
+			return errNotSupport
+		}
+		data.SetString(converted)
+	case reflect.Bool:
+		converted, ok := newValue.(bool)
+		if !ok {
+			return errNotSupport
+		}
+		data.SetBool(converted)
+	case reflect.Complex64:
+		converted, ok := newValue.(complex128)
+		if !ok {
+			return errNotSupport
+		}
+		data.SetComplex(complex128(complex64(converted)))
+	case reflect.Complex128:
+		converted, ok := newValue.(complex128)
+		if !ok {
+			return errNotSupport
+		}
+		data.SetComplex(converted)
+	case reflect.Interface:
+		data.Set(reflect.ValueOf(newValue))
+	default:
+		return errNotSupport
+	}
+	return nil
+}

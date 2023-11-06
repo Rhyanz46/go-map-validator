@@ -17,5 +17,9 @@ type loadOperationType interface {
 }
 
 type finalOperationType interface {
-	RunValidate() error
+	RunValidate() (*extraOperation, error)
+}
+
+type extraOperationType interface {
+	Bind(i interface{}) error
 }
