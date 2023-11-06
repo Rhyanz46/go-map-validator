@@ -48,3 +48,53 @@ func ValidateJson(payload map[string]interface{}) (statusCode int, err error) {
     return http.StatusOK, nil
 }
 ```
+
+### Enum Validation
+```go
+payload := map[string]interface{}{"data": "arian", "jenis_kelamin": "laki-laki", "hoby": "Main PS"}
+_, err := Validate(
+    "data", payload, RequestDataValidator{
+        Null: false,
+        Enum: &EnumField[any]{Items: []string{"arian", "aaa"}},
+    },
+)
+if err != nil {
+    t.Errorf("Test case 1 Error : %v", err)
+}
+```
+
+### Email Validation
+```go
+payload := map[string]interface{}{
+    "email": "test@example.com",
+}
+
+validator := RequestDataValidator{
+    Email: true,
+}
+
+_, err := Validate("email", payload, validator)
+
+if err != nil {
+    fmt.Println("Error :", err)
+}
+```
+
+
+### IPv4 Validation
+```go
+payload := map[string]interface{}{
+    "ip_address": "192.168.1.1",
+}
+
+validator := RequestDataValidator{
+    IPV4: true,
+}
+
+_, err := Validate("email", payload, validator)
+
+if err != nil {
+    fmt.Println("Error :", err)
+}
+```
+
