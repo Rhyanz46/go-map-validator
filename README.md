@@ -27,24 +27,24 @@ if err == nil {
 ### Example Echo Framework
 ```go
 func handleLogin(c echo.Context) error {
-	jsonHttp, err := map_validator.NewValidateBuilder().SetRules(map[string]map_validator.Rules{
-		"email":    {Email: true, Max: map_validator.ToPointer[int](100)},
-		"password": {Type: reflect.String, Min: map_validator.ToPointer[int](6), Max: map_validator.ToPointer[int](30)},
-	}).LoadJsonHttp(c.Request())
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, err)
-	}
-	err = jsonHttp.RunValidate()
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, err)
-	}
-	return c.NoContent(http.StatusOK)
+    jsonHttp, err := map_validator.NewValidateBuilder().SetRules(map[string]map_validator.Rules{
+        "email":    {Email: true, Max: map_validator.ToPointer[int](100)},
+        "password": {Type: reflect.String, Min: map_validator.ToPointer[int](6), Max: map_validator.ToPointer[int](30)},
+    }).LoadJsonHttp(c.Request())
+    if err != nil {
+        return c.JSON(http.StatusBadRequest, err)
+    }
+    err = jsonHttp.RunValidate()
+    if err != nil {
+        return c.JSON(http.StatusBadRequest, err)
+    }
+    return c.NoContent(http.StatusOK)
 }
 
 func main() {
-	e := echo.New()
-	e.POST("/login", handleLogin)
-	e.Start(":3000")
+    e := echo.New()
+    e.POST("/login", handleLogin)
+    e.Start(":3000")
 }
 
 ```
