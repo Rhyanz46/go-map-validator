@@ -1,4 +1,4 @@
-package mapValidator
+package map_validator
 
 import (
 	"reflect"
@@ -10,12 +10,12 @@ func TestValidateUUID(t *testing.T) {
 		"field1": "123e4567-e89b-12d3-a456-426614174001",
 	}
 
-	validator := RequestDataValidator{
+	validator := Rules{
 		UUID: true,
 		Null: false,
 	}
 
-	_, err := Validate("field1", payload, validator)
+	_, err := validate("field1", payload, validator)
 
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
@@ -27,12 +27,12 @@ func TestValidateInvalidUUID(t *testing.T) {
 		"field1": "invalid-uuid",
 	}
 
-	validator := RequestDataValidator{
+	validator := Rules{
 		UUID: true,
 		Null: false,
 	}
 
-	_, err := Validate("field1", payload, validator)
+	_, err := validate("field1", payload, validator)
 
 	if err == nil {
 		t.Errorf("Expected error, but got none")
@@ -49,12 +49,12 @@ func TestValidateNotNull(t *testing.T) {
 		"field1": "value",
 	}
 
-	validator := RequestDataValidator{
+	validator := Rules{
 		Type: reflect.String,
 		Null: false,
 	}
 
-	_, err := Validate("field1", payload, validator)
+	_, err := validate("field1", payload, validator)
 
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
@@ -66,12 +66,12 @@ func TestValidateNullNotAllowed(t *testing.T) {
 		"field1": nil,
 	}
 
-	validator := RequestDataValidator{
+	validator := Rules{
 		Type: reflect.String,
 		Null: false,
 	}
 
-	_, err := Validate("field1", payload, validator)
+	_, err := validate("field1", payload, validator)
 
 	if err == nil {
 		t.Errorf("Expected error, but got none")
@@ -88,12 +88,12 @@ func TestValidateStringMaxLength(t *testing.T) {
 		"field1": "1234567890",
 	}
 
-	validator := RequestDataValidator{
+	validator := Rules{
 		Type: reflect.String,
 		Max:  ToPointer[int](5),
 	}
 
-	_, err := Validate("field1", payload, validator)
+	_, err := validate("field1", payload, validator)
 
 	if err == nil {
 		t.Errorf("Expected error, but got none")
@@ -110,12 +110,12 @@ func TestValidateStringMinLength(t *testing.T) {
 		"field1": "123",
 	}
 
-	validator := RequestDataValidator{
+	validator := Rules{
 		Type: reflect.String,
 		Min:  ToPointer[int](5),
 	}
 
-	_, err := Validate("field1", payload, validator)
+	_, err := validate("field1", payload, validator)
 
 	if err == nil {
 		t.Errorf("Expected error, but got none")
@@ -132,11 +132,11 @@ func TestValidateEmail(t *testing.T) {
 		"email": "test@example.com",
 	}
 
-	validator := RequestDataValidator{
+	validator := Rules{
 		Email: true,
 	}
 
-	_, err := Validate("email", payload, validator)
+	_, err := validate("email", payload, validator)
 
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
@@ -148,11 +148,11 @@ func TestValidateInvalidEmail(t *testing.T) {
 		"email": "invalid-email",
 	}
 
-	validator := RequestDataValidator{
+	validator := Rules{
 		Email: true,
 	}
 
-	_, err := Validate("email", payload, validator)
+	_, err := validate("email", payload, validator)
 
 	if err == nil {
 		t.Errorf("Expected error, but got none")
@@ -169,11 +169,11 @@ func TestValidateIPV4(t *testing.T) {
 		"ip_address": "192.168.1.1",
 	}
 
-	validator := RequestDataValidator{
+	validator := Rules{
 		IPV4: true,
 	}
 
-	_, err := Validate("ip_address", payload, validator)
+	_, err := validate("ip_address", payload, validator)
 
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
@@ -185,11 +185,11 @@ func TestValidateInvalidIPV4(t *testing.T) {
 		"ip_address": "invalid-ip",
 	}
 
-	validator := RequestDataValidator{
+	validator := Rules{
 		IPV4: true,
 	}
 
-	_, err := Validate("ip_address", payload, validator)
+	_, err := validate("ip_address", payload, validator)
 
 	if err == nil {
 		t.Errorf("Expected error, but got none")
@@ -202,9 +202,9 @@ func TestValidateInvalidIPV4(t *testing.T) {
 }
 
 func TestEnumFieldCheck(t *testing.T) {
-	payload := map[string]interface{}{"data": "arian", "jenis_kelamin": "laki-laki", "hoby": "Main PS"}
-	_, err := Validate(
-		"data", payload, RequestDataValidator{
+	payload := map[string]interface{}{"validatorType": "arian", "jenis_kelamin": "laki-laki", "hoby": "Main PS"}
+	_, err := validate(
+		"validatorType", payload, Rules{
 			Null: false,
 			Enum: &EnumField[any]{Items: []string{"arian", "aaa"}},
 		},
@@ -213,8 +213,8 @@ func TestEnumFieldCheck(t *testing.T) {
 		t.Errorf("Test case 1 Error : %v", err)
 	}
 
-	_, err = Validate(
-		"jenis_kelamin", payload, RequestDataValidator{
+	_, err = validate(
+		"jenis_kelamin", payload, Rules{
 			Null: false,
 			Enum: &EnumField[any]{Items: []string{"perempuan", "laki-laki"}},
 		},
@@ -223,8 +223,8 @@ func TestEnumFieldCheck(t *testing.T) {
 		t.Errorf("Test case 2 Error : %v", err)
 	}
 
-	_, err = Validate(
-		"jenis_kelamin", payload, RequestDataValidator{
+	_, err = validate(
+		"jenis_kelamin", payload, Rules{
 			Null: false,
 			Enum: &EnumField[any]{Items: []string{"bola", "badminton", "renang"}},
 		},
@@ -233,25 +233,4 @@ func TestEnumFieldCheck(t *testing.T) {
 		t.Errorf("Test case 3 Error : this sould be error")
 	}
 
-}
-
-func TestMultipleValidation(t *testing.T) {
-	payload := map[string]interface{}{"jenis_kelamin": "laki-laki", "hoby": "Main PS", "umur": 1, "menikah": true}
-	err := MultiValidate(payload, map[string]RequestDataValidator{
-		"jenis_kelamin": {Enum: &EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
-		"hoby":          {Type: reflect.String, Null: false},
-		"menikah":       {Type: reflect.Bool, Null: false},
-	})
-	if err != nil {
-		t.Errorf("Expected not have error, but got error : %s", err)
-	}
-
-	err = MultiValidate(payload, map[string]RequestDataValidator{
-		"jenis_kelamin": {Enum: &EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
-		"hoby":          {Type: reflect.Int, Null: false},
-		"menikah":       {Type: reflect.Bool, Null: false},
-	})
-	if err == nil {
-		t.Error("Expected have an error, but you got no error")
-	}
 }

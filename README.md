@@ -28,19 +28,19 @@ func Create(c *gin.Context){
 
 func ValidateJson(payload map[string]interface{}) (statusCode int, err error) {
     _, err = mapValidator.Validate(
-        "project_id", payload, mapValidator.RequestDataValidator{UUID: true, Null: false},
+        "project_id", payload, mapValidator.Rules{UUID: true, Null: false},
     )
     if err != nil {
         return http.StatusBadRequest, err
     }
     _, err = mapValidator.Validate(
-        "name", payload, mapValidator.RequestDataValidator{Type: reflect.String, Null: false, Max: mapValidator.ToPointer[int](100)},
+        "name", payload, mapValidator.Rules{Type: reflect.String, Null: false, Max: mapValidator.ToPointer[int](100)},
     )
     if err != nil {
         return http.StatusBadRequest, err
     }
     _, err := mapValidator.Validate(
-        "description", payload, mapValidator.RequestDataValidator{Type: reflect.String, Null: true, NilIfNull: true},
+        "description", payload, mapValidator.Rules{Type: reflect.String, Null: true, NilIfNull: true},
     )
     if err != nil {
         return http.StatusBadRequest, err
@@ -53,7 +53,7 @@ func ValidateJson(payload map[string]interface{}) (statusCode int, err error) {
 ```go
 payload := map[string]interface{}{"data": "arian", "jenis_kelamin": "laki-laki", "hoby": "Main PS"}
 _, err := Validate(
-    "data", payload, RequestDataValidator{
+    "data", payload, Rules{
         Null: false,
         Enum: &EnumField[any]{Items: []string{"arian", "aaa"}},
     },
@@ -69,7 +69,7 @@ payload := map[string]interface{}{
     "email": "test@example.com",
 }
 
-validator := RequestDataValidator{
+validator := Rules{
     Email: true,
 }
 
@@ -87,7 +87,7 @@ payload := map[string]interface{}{
     "ip_address": "192.168.1.1",
 }
 
-validator := RequestDataValidator{
+validator := Rules{
     IPV4: true,
 }
 
@@ -101,7 +101,7 @@ if err != nil {
 ### Multiple Error Handling
 ```go
 payload := map[string]interface{}{"jenis_kelamin": "laki-laki", "hoby": "Main PS", "umur": 1, "menikah": true}
-err := MultiValidate(payload, map[string]RequestDataValidator{
+err := MultiValidate(payload, map[string]Rules{
     "jenis_kelamin": {Enum: &EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
     "hoby":          {Type: reflect.String, Null: false},
     "menikah":       {Type: reflect.Bool, Null: false},

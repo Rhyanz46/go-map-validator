@@ -1,6 +1,9 @@
-package mapValidator
+package map_validator
 
-import "reflect"
+import (
+	"mime/multipart"
+	"reflect"
+)
 
 type EnumField[T any] struct {
 	Items               T
@@ -15,7 +18,7 @@ type CustomMsg struct {
 	OnMin               *string
 }
 
-type RequestDataValidator struct {
+type Rules struct {
 	Null               bool
 	NilIfNull          bool
 	IsMapInterface     bool
@@ -28,7 +31,27 @@ type RequestDataValidator struct {
 	UUID               bool
 	UUIDToString       bool
 	IPV4               bool
+	IPV4Network        bool
 	IPv4OptionalPrefix bool
+	File               bool
 
 	CustomMsg CustomMsg // will support soon
+}
+
+type FileRequest struct {
+	File     multipart.File
+	FileInfo *multipart.FileHeader
+}
+
+type ruleState struct {
+	rules map[string]Rules
+}
+
+type dataState struct {
+	*ruleState
+	data map[string]interface{}
+}
+
+type finalOperation struct {
+	*dataState
 }

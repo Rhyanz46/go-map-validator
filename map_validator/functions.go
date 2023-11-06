@@ -1,4 +1,4 @@
-package mapValidator
+package map_validator
 
 import (
 	"bytes"
@@ -12,10 +12,6 @@ import (
 	"strings"
 	"unicode/utf8"
 )
-
-type data interface {
-	int | string
-}
 
 func isEqualString(current, allowedField string) bool {
 	return current == allowedField
@@ -33,17 +29,7 @@ func isEqualInt64(current, allowedField int64) bool {
 	return current == allowedField
 }
 
-func IsIPv4PrefixValid(prefix string) (res bool) {
-	for _, allowPrefix := range []string{"8", "16", "24", "32"} {
-		if prefix == allowPrefix {
-			res = true
-			break
-		}
-	}
-	return
-}
-
-func IsEmail(email string) bool {
+func isEmail(email string) bool {
 	ok := strings.Contains(email, "@")
 	if !ok {
 		return false
@@ -52,7 +38,7 @@ func IsEmail(email string) bool {
 	return ok
 }
 
-func ValueInList[T any](listData []T, data T, compare func(T, T) bool) bool {
+func valueInList[T any](listData []T, data T, compare func(T, T) bool) bool {
 	for _, currentValue := range listData {
 		if compare(currentValue, data) {
 			return true
@@ -61,13 +47,13 @@ func ValueInList[T any](listData []T, data T, compare func(T, T) bool) bool {
 	return false
 }
 
-func IsIPv4Valid(ip string) bool {
+func isIPv4Valid(ip string) bool {
 	parsedIP := net.ParseIP(ip)
 	return parsedIP != nil && parsedIP.To4() != nil
 }
 
-func IsIPv4NetworkValid(ip string) bool {
-	if IsIPv4Valid(ip) {
+func isIPv4NetworkValid(ip string) bool {
+	if isIPv4Valid(ip) {
 		ipString := strings.Split(ip, ".")
 		if ipString[3] == "0" {
 			return true
@@ -76,7 +62,7 @@ func IsIPv4NetworkValid(ip string) bool {
 	return false
 }
 
-func Validate(field string, dataTemp map[string]interface{}, validator RequestDataValidator) (interface{}, error) {
+func validate(field string, dataTemp map[string]interface{}, validator Rules) (interface{}, error) {
 	data := dataTemp[field]
 
 	// null validation
@@ -97,30 +83,35 @@ func Validate(field string, dataTemp map[string]interface{}, validator RequestDa
 		var res map[string]interface{}
 		err := json.NewEncoder(ioData).Encode(&m)
 		if err != nil {
-			return nil, errors.New("data in '" + field + "' field is not valid object")
+			return nil, errors.New("validatorType in '" + field + "' field is not valid object")
 		}
 		err = json.NewDecoder(ioData).Decode(&res)
 		if err != nil {
-			return nil, errors.New("data in '" + field + "' field is not valid object")
+			return nil, errors.New("validatorType in '" + field + "' field is not valid object")
 		}
 		return res, nil
 	}
 
-	// data type validation
+	// validatorType type validation
 	dataType := reflect.TypeOf(data).Kind()
 	if validator.Type == reflect.Int {
 		validator.Type = reflect.Float64
 	}
 
 	if dataType == reflect.Slice && !validator.Null && len(ToInterfaceSlice(data)) == 0 {
-		return nil, errors.New("you need to input data in '" + field + "' field")
+		return nil, errors.New("you need to input validatorType in '" + field + "' field")
 	}
 
-	if !validator.UUID && !validator.IPV4 && dataType != validator.Type && !validator.UUIDToString && !validator.IPv4OptionalPrefix && !validator.Email && validator.Enum == nil {
+	if !validator.UUID && !validator.IPV4 && dataType != validator.Type && !validator.UUIDToString && !validator.IPv4OptionalPrefix && !validator.Email && validator.Enum == nil && !validator.File && !validator.IPV4Network {
 		if validator.Type == reflect.Float64 {
 			validator.Type = reflect.Int
 		}
 		return nil, errors.New("the field '" + field + "' should be '" + validator.Type.String() + "'")
+	}
+
+	if validator.File {
+		//this will return FileRequest
+		return data, nil
 	}
 
 	if validator.Enum != nil {
@@ -136,7 +127,7 @@ func Validate(field string, dataTemp map[string]interface{}, validator RequestDa
 				for i := 0; i < enumValue.Len(); i++ {
 					values = append(values, int(enumValue.Index(i).Int()))
 				}
-				if !ValueInList[int](values, data.(int), isEqualInt) {
+				if !valueInList[int](values, data.(int), isEqualInt) {
 					return nil, errors.New(fmt.Sprintf("the field '%s' value is not in enum list%v", field, values))
 				}
 			case reflect.Int64:
@@ -144,7 +135,7 @@ func Validate(field string, dataTemp map[string]interface{}, validator RequestDa
 				for i := 0; i < enumValue.Len(); i++ {
 					values = append(values, enumValue.Index(i).Int())
 				}
-				if !ValueInList[int64](values, data.(int64), isEqualInt64) {
+				if !valueInList[int64](values, data.(int64), isEqualInt64) {
 					return nil, errors.New(fmt.Sprintf("the field '%s' value is not in enum list%v", field, values))
 				}
 			case reflect.Float64:
@@ -152,7 +143,7 @@ func Validate(field string, dataTemp map[string]interface{}, validator RequestDa
 				for i := 0; i < enumValue.Len(); i++ {
 					values = append(values, enumValue.Index(i).Float())
 				}
-				if !ValueInList[float64](values, data.(float64), isEqualFloat64) {
+				if !valueInList[float64](values, data.(float64), isEqualFloat64) {
 					return nil, errors.New(fmt.Sprintf("the field '%s' value is not in enum list%v", field, values))
 				}
 			case reflect.String:
@@ -160,11 +151,11 @@ func Validate(field string, dataTemp map[string]interface{}, validator RequestDa
 				for i := 0; i < enumValue.Len(); i++ {
 					values = append(values, enumValue.Index(i).String())
 				}
-				if !ValueInList[string](values, data.(string), isEqualString) {
+				if !valueInList[string](values, data.(string), isEqualString) {
 					return nil, errors.New(fmt.Sprintf("the field '%s' value is not in enum list%v", field, values))
 				}
 			default:
-				panic("not support type data for enum value")
+				panic("not support type validatorType for enum value")
 			}
 		}
 		return data, nil
@@ -191,7 +182,7 @@ func Validate(field string, dataTemp map[string]interface{}, validator RequestDa
 	}
 
 	if validator.Email {
-		if reflect.TypeOf(data).Kind() != reflect.String || !IsEmail(data.(string)) {
+		if reflect.TypeOf(data).Kind() != reflect.String || !isEmail(data.(string)) {
 			return nil, errors.New("field " + field + " is not valid email")
 		}
 	}
@@ -202,7 +193,19 @@ func Validate(field string, dataTemp map[string]interface{}, validator RequestDa
 		if !ok {
 			return nil, errMsg
 		}
-		if !IsIPv4Valid(stringIp) {
+		if !isIPv4Valid(stringIp) {
+			return nil, errMsg
+		}
+		return stringIp, nil
+	}
+
+	if validator.IPV4Network {
+		errMsg := errors.New("the field '" + field + "' it's not valid IP Network")
+		stringIp, ok := data.(string)
+		if !ok {
+			return nil, errMsg
+		}
+		if !isIPv4NetworkValid(stringIp) {
 			return nil, errMsg
 		}
 		return stringIp, nil
@@ -218,12 +221,12 @@ func Validate(field string, dataTemp map[string]interface{}, validator RequestDa
 		if len(splitIp) > 2 {
 			return nil, errMsg
 		} else if len(splitIp) == 1 {
-			if !IsIPv4Valid(splitIp[0]) {
+			if !isIPv4Valid(splitIp[0]) {
 				return nil, errMsg
 			}
 			return stringIp, nil
 		} else if len(splitIp) == 2 {
-			if !IsIPv4Valid(splitIp[0]) {
+			if !isIPv4Valid(splitIp[0]) {
 				return nil, errMsg
 			}
 			prefix, err := strconv.Atoi(splitIp[1])
@@ -279,7 +282,7 @@ func Validate(field string, dataTemp map[string]interface{}, validator RequestDa
 	return data, nil
 }
 
-func ToPointer[T data](data T) (res *T) {
+func ToPointer[T validatorType](data T) (res *T) {
 	res = &data
 	return
 }
@@ -301,14 +304,4 @@ func ToInterfaceSlice(slice interface{}) []interface{} {
 	}
 
 	return ret
-}
-
-func MultiValidate(data map[string]interface{}, validations map[string]RequestDataValidator) error {
-	for key, validationData := range validations {
-		_, err := Validate(key, data, validationData)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
