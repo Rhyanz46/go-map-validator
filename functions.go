@@ -17,6 +17,22 @@ type data interface {
 	int | string
 }
 
+func isEqualString(current, allowedField string) bool {
+	return current == allowedField
+}
+
+func isEqualFloat64(current, allowedField float64) bool {
+	return current == allowedField
+}
+
+func isEqualInt(current, allowedField int) bool {
+	return current == allowedField
+}
+
+func isEqualInt64(current, allowedField int64) bool {
+	return current == allowedField
+}
+
 func IsIPv4PrefixValid(prefix string) (res bool) {
 	for _, allowPrefix := range []string{"8", "16", "24", "32"} {
 		if prefix == allowPrefix {
@@ -34,6 +50,15 @@ func IsEmail(email string) bool {
 	}
 	ok = strings.Contains(strings.Split(email, "@")[1], ".")
 	return ok
+}
+
+func ValueInList[T any](listData []T, data T, compare func(T, T) bool) bool {
+	for _, currentValue := range listData {
+		if compare(currentValue, data) {
+			return true
+		}
+	}
+	return false
 }
 
 func IsIPv4Valid(ip string) bool {
@@ -91,8 +116,55 @@ func Validate(field string, dataTemp map[string]interface{}, validator RequestDa
 		return nil, errors.New("you need to input data in '" + field + "' field")
 	}
 
-	if !validator.UUID && !validator.IPV4 && dataType != validator.Type && !validator.UUIDToString && !validator.IPv4OptionalPrefix && !validator.Email {
+	if !validator.UUID && !validator.IPV4 && dataType != validator.Type && !validator.UUIDToString && !validator.IPv4OptionalPrefix && !validator.Email && validator.Enum == nil {
 		return nil, errors.New("the field '" + field + "' should be '" + validator.Type.String() + "'")
+	}
+
+	if validator.Enum != nil {
+		enumType := reflect.TypeOf(validator.Enum.Items)
+		if enumType.Kind() == reflect.Slice {
+			enumValue := reflect.ValueOf(validator.Enum.Items)
+			if dataType != enumType.Elem().Kind() {
+				return nil, errors.New("the field '" + field + "' should be '" + enumType.Elem().Kind().String() + "'")
+			}
+			switch dataType {
+			case reflect.Int:
+				var values []int
+				for i := 0; i < enumValue.Len(); i++ {
+					values = append(values, int(enumValue.Index(i).Int()))
+				}
+				if !ValueInList[int](values, data.(int), isEqualInt) {
+					return nil, errors.New(fmt.Sprintf("the field '%s' value is not in enum list%v", field, values))
+				}
+			case reflect.Int64:
+				var values []int64
+				for i := 0; i < enumValue.Len(); i++ {
+					values = append(values, enumValue.Index(i).Int())
+				}
+				if !ValueInList[int64](values, data.(int64), isEqualInt64) {
+					return nil, errors.New(fmt.Sprintf("the field '%s' value is not in enum list%v", field, values))
+				}
+			case reflect.Float64:
+				var values []float64
+				for i := 0; i < enumValue.Len(); i++ {
+					values = append(values, enumValue.Index(i).Float())
+				}
+				if !ValueInList[float64](values, data.(float64), isEqualFloat64) {
+					return nil, errors.New(fmt.Sprintf("the field '%s' value is not in enum list%v", field, values))
+				}
+			case reflect.String:
+				var values []string
+				for i := 0; i < enumValue.Len(); i++ {
+					values = append(values, enumValue.Index(i).String())
+				}
+				if !ValueInList[string](values, data.(string), isEqualString) {
+					return nil, errors.New(fmt.Sprintf("the field '%s' value is not in enum list%v", field, values))
+				}
+			default:
+				panic("not support type data for enum value")
+			}
+		}
+		return data, nil
 	}
 
 	if validator.UUIDToString {
