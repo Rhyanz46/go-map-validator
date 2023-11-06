@@ -98,3 +98,15 @@ if err != nil {
 }
 ```
 
+### Multiple Error Handling
+```go
+payload := map[string]interface{}{"jenis_kelamin": "laki-laki", "hoby": "Main PS", "umur": 1, "menikah": true}
+err := MultiValidate(payload, map[string]RequestDataValidator{
+    "jenis_kelamin": {Enum: &EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
+    "hoby":          {Type: reflect.String, Null: false},
+    "menikah":       {Type: reflect.Bool, Null: false},
+})
+if err != nil {
+    fmt.Println("Expected not have error, but got error : ", err)
+}
+```

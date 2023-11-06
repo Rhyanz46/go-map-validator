@@ -117,6 +117,9 @@ func Validate(field string, dataTemp map[string]interface{}, validator RequestDa
 	}
 
 	if !validator.UUID && !validator.IPV4 && dataType != validator.Type && !validator.UUIDToString && !validator.IPv4OptionalPrefix && !validator.Email && validator.Enum == nil {
+		if validator.Type == reflect.Float64 {
+			validator.Type = reflect.Int
+		}
 		return nil, errors.New("the field '" + field + "' should be '" + validator.Type.String() + "'")
 	}
 
@@ -298,4 +301,14 @@ func ToInterfaceSlice(slice interface{}) []interface{} {
 	}
 
 	return ret
+}
+
+func MultiValidate(data map[string]interface{}, validations map[string]RequestDataValidator) error {
+	for key, validationData := range validations {
+		_, err := Validate(key, data, validationData)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

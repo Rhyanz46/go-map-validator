@@ -234,3 +234,24 @@ func TestEnumFieldCheck(t *testing.T) {
 	}
 
 }
+
+func TestMultipleValidation(t *testing.T) {
+	payload := map[string]interface{}{"jenis_kelamin": "laki-laki", "hoby": "Main PS", "umur": 1, "menikah": true}
+	err := MultiValidate(payload, map[string]RequestDataValidator{
+		"jenis_kelamin": {Enum: &EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
+		"hoby":          {Type: reflect.String, Null: false},
+		"menikah":       {Type: reflect.Bool, Null: false},
+	})
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+	}
+
+	err = MultiValidate(payload, map[string]RequestDataValidator{
+		"jenis_kelamin": {Enum: &EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
+		"hoby":          {Type: reflect.Int, Null: false},
+		"menikah":       {Type: reflect.Bool, Null: false},
+	})
+	if err == nil {
+		t.Error("Expected have an error, but you got no error")
+	}
+}
