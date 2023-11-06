@@ -1,8 +1,6 @@
 # simple validator for map value
 
-```
-You can integrate with all golang framework using http.Request
-```
+You can integrate with all golang framework using `http.Request` interface
 
 ### Install 
 ```shell
