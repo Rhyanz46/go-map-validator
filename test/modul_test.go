@@ -24,5 +24,10 @@ func TestMultipleValidation(t *testing.T) {
 	}).Load(payload).RunValidate()
 	if err == nil {
 		t.Error("Expected have an error, but you got no error")
+	} else {
+		expected := "the field 'hoby' should be 'int'"
+		if err.Error() != expected {
+			t.Errorf("Expected :%s. But you got : %s", expected, err)
+		}
 	}
 }
