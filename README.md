@@ -1,5 +1,10 @@
 # simple validator for map value
 
+```
+You can integrate with all golang framework using http.Request
+```
+
+### Install 
 ```shell
 go get github.com/Rhyanz46/go-map-validator/map_validator@v0.0.1
 ```
