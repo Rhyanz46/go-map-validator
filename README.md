@@ -92,7 +92,7 @@ if testBind.JK != payload["jenis_kelamin"] {
 ```
 
 ## Features
-- validate value in by keys `map[string]interface{}`
+- validate value in `map[string]interface{}` by keys
 - validate data from `http.Request` json/multipart
   - support file upload
 
