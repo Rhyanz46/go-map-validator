@@ -15,7 +15,7 @@ func TestValidateUUID(t *testing.T) {
 		Null: false,
 	}
 
-	_, err := validate("field1", payload, validator)
+	_, err := validate("field1", payload, validator, fromHttpJson)
 
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
@@ -32,7 +32,7 @@ func TestValidateInvalidUUID(t *testing.T) {
 		Null: false,
 	}
 
-	_, err := validate("field1", payload, validator)
+	_, err := validate("field1", payload, validator, fromHttpJson)
 
 	if err == nil {
 		t.Errorf("Expected error, but got none")
@@ -54,7 +54,7 @@ func TestValidateNotNull(t *testing.T) {
 		Null: false,
 	}
 
-	_, err := validate("field1", payload, validator)
+	_, err := validate("field1", payload, validator, fromHttpJson)
 
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
@@ -71,7 +71,7 @@ func TestValidateNullNotAllowed(t *testing.T) {
 		Null: false,
 	}
 
-	_, err := validate("field1", payload, validator)
+	_, err := validate("field1", payload, validator, fromHttpJson)
 
 	if err == nil {
 		t.Errorf("Expected error, but got none")
@@ -93,7 +93,7 @@ func TestValidateStringMaxLength(t *testing.T) {
 		Max:  SetTotal(5),
 	}
 
-	_, err := validate("field1", payload, validator)
+	_, err := validate("field1", payload, validator, fromHttpJson)
 
 	if err == nil {
 		t.Errorf("Expected error, but got none")
@@ -115,7 +115,7 @@ func TestValidateStringMinLength(t *testing.T) {
 		Min:  SetTotal(5),
 	}
 
-	_, err := validate("field1", payload, validator)
+	_, err := validate("field1", payload, validator, fromHttpJson)
 
 	if err == nil {
 		t.Errorf("Expected error, but got none")
@@ -136,7 +136,7 @@ func TestValidateEmail(t *testing.T) {
 		Email: true,
 	}
 
-	_, err := validate("email", payload, validator)
+	_, err := validate("email", payload, validator, fromHttpJson)
 
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
@@ -152,7 +152,7 @@ func TestValidateInvalidEmail(t *testing.T) {
 		Email: true,
 	}
 
-	_, err := validate("email", payload, validator)
+	_, err := validate("email", payload, validator, fromHttpJson)
 
 	if err == nil {
 		t.Errorf("Expected error, but got none")
@@ -173,7 +173,7 @@ func TestValidateIPV4(t *testing.T) {
 		IPV4: true,
 	}
 
-	_, err := validate("ip_address", payload, validator)
+	_, err := validate("ip_address", payload, validator, fromHttpJson)
 
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
@@ -189,7 +189,7 @@ func TestValidateInvalidIPV4(t *testing.T) {
 		IPV4: true,
 	}
 
-	_, err := validate("ip_address", payload, validator)
+	_, err := validate("ip_address", payload, validator, fromHttpJson)
 
 	if err == nil {
 		t.Errorf("Expected error, but got none")
@@ -207,7 +207,7 @@ func TestEnumFieldCheck(t *testing.T) {
 		"validatorType", payload, Rules{
 			Null: false,
 			Enum: &EnumField[any]{Items: []string{"arian", "aaa"}},
-		},
+		}, fromHttpJson,
 	)
 	if err != nil {
 		t.Errorf("Test case 1 Error : %v", err)
@@ -217,7 +217,7 @@ func TestEnumFieldCheck(t *testing.T) {
 		"jenis_kelamin", payload, Rules{
 			Null: false,
 			Enum: &EnumField[any]{Items: []string{"perempuan", "laki-laki"}},
-		},
+		}, fromHttpJson,
 	)
 	if err != nil {
 		t.Errorf("Test case 2 Error : %v", err)
@@ -227,7 +227,7 @@ func TestEnumFieldCheck(t *testing.T) {
 		"jenis_kelamin", payload, Rules{
 			Null: false,
 			Enum: &EnumField[any]{Items: []string{"bola", "badminton", "renang"}},
-		},
+		}, fromHttpJson,
 	)
 	if err == nil {
 		t.Errorf("Test case 3 Error : this sould be error")
@@ -240,7 +240,17 @@ func TestIntFamily(t *testing.T) {
 	_, err := validate(
 		"umur", payload, Rules{
 			Type: reflect.Int,
-		},
+		}, fromMapString,
+	)
+	if err != nil {
+		t.Errorf("Test case 1 Error : %v", err)
+	}
+
+	payload = map[string]interface{}{"umur": 1, "harga": 1.3}
+	_, err = validate(
+		"umur", payload, Rules{
+			Type: reflect.Int,
+		}, fromHttpJson,
 	)
 	if err != nil {
 		t.Errorf("Test case 1 Error : %v", err)
@@ -249,7 +259,7 @@ func TestIntFamily(t *testing.T) {
 	_, err = validate(
 		"harga", payload, Rules{
 			Type: reflect.Float64,
-		},
+		}, fromHttpJson,
 	)
 	if err != nil {
 		t.Errorf("Test case 2 Error : %v", err)

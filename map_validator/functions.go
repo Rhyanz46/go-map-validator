@@ -95,8 +95,9 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 
 	// validatorType type validation
 	dataType := reflect.TypeOf(data).Kind()
+	customData := !(!validator.UUID && !validator.IPV4 && !validator.UUIDToString && !validator.IPv4OptionalPrefix && !validator.Email && validator.Enum == nil && !validator.File && !validator.IPV4Network)
 	if dataFrom == fromHttpJson {
-		if isIntegerFamily(validator.Type) {
+		if isIntegerFamily(validator.Type) && customData {
 			validator.Type = reflect.Float64
 		}
 	}
@@ -105,7 +106,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 		return nil, errors.New("you need to input validatorType in '" + field + "' field")
 	}
 
-	if !validator.UUID && !validator.IPV4 && dataType != validator.Type && !validator.UUIDToString && !validator.IPv4OptionalPrefix && !validator.Email && validator.Enum == nil && !validator.File && !validator.IPV4Network {
+	if dataType != validator.Type && !customData {
 		if dataFrom == fromHttpJson {
 			if isIntegerFamily(validator.Type) {
 				validator.Type = reflect.Int
