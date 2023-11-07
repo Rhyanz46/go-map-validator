@@ -24,4 +24,5 @@ type extraOperationType interface {
 	Bind(i interface{}) error
 	GetFilledField() []string
 	GetNullField() []string
+	GetData() map[string]interface{}
 }

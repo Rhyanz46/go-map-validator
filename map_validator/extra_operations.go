@@ -68,3 +68,7 @@ func (state *extraOperation) GetNullField() []string {
 	}
 	return []string{}
 }
+
+func (state *extraOperation) GetData() map[string]interface{} {
+	return *state.data
+}

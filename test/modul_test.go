@@ -208,3 +208,23 @@ func TestFilledAndNullField(t *testing.T) {
 		t.Errorf("Expected 1, but got error : %v", totalFilled)
 	}
 }
+
+func TestGetMapData(t *testing.T) {
+	payload := map[string]interface{}{"nama": "arian", "umur": 1}
+	validRole := map[string]map_validator.Rules{
+		"nama": {Type: reflect.String},
+		"hoby": {Type: reflect.String, Null: true},
+		"umur": {Type: reflect.Int, Null: false},
+	}
+	check := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
+	extraCheck, err := check.RunValidate()
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+	}
+	expectedKeys := getAllKeys(payload)
+	for _, key := range getAllKeys(extraCheck.GetData()) {
+		if !isDataInList(key, expectedKeys) {
+			t.Errorf("Key is not Expected : %v", key)
+		}
+	}
+}
