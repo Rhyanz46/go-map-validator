@@ -126,10 +126,15 @@ func (state *extraOperation) Bind(i interface{}) error {
 			continue
 		}
 
-		if field.Type.Kind() == reflect.TypeOf(state.data[tag]).Kind() &&
+		if field.Type.Kind() == reflect.Ptr && reflect.TypeOf(state.data[tag]).Kind() == field.Type.Elem().Kind() {
+			err := convertValue(state.data[tag], field.Type.Elem().Kind(), el.Field(i), true)
+			if err != nil {
+				return err
+			}
+		} else if field.Type.Kind() == reflect.TypeOf(state.data[tag]).Kind() &&
 			field.Type.Kind() != reflect.Interface &&
 			field.Type.Kind() != reflect.Struct {
-			err := convertValue(state.data[tag], field.Type.Kind(), el.Field(i))
+			err := convertValue(state.data[tag], field.Type.Kind(), el.Field(i), false)
 			if err != nil {
 				return err
 			}

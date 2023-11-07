@@ -305,7 +305,7 @@ func ToInterfaceSlice(slice interface{}) []interface{} {
 	return ret
 }
 
-func convertValue(newValue interface{}, kind reflect.Kind, data reflect.Value) error {
+func convertValue(newValue interface{}, kind reflect.Kind, data reflect.Value, pointer bool) error {
 	errNotSupport := errors.New("not support data")
 	switch kind {
 	case reflect.Int:
@@ -313,97 +313,161 @@ func convertValue(newValue interface{}, kind reflect.Kind, data reflect.Value) e
 		if !ok {
 			return errNotSupport
 		}
-		data.SetInt(int64(converted))
+		if pointer {
+			data.Set(reflect.ValueOf(&converted))
+		} else {
+			data.SetInt(int64(converted))
+		}
 	case reflect.Int8:
 		converted, ok := newValue.(int64)
 		if !ok {
 			return errNotSupport
 		}
-		data.SetInt(converted)
+		if pointer {
+			data.Set(reflect.ValueOf(&converted))
+		} else {
+			data.SetInt(converted)
+		}
 	case reflect.Int16:
 		converted, ok := newValue.(int64)
 		if !ok {
 			return errNotSupport
 		}
-		data.SetInt(converted)
+		if pointer {
+			data.Set(reflect.ValueOf(&converted))
+		} else {
+			data.SetInt(converted)
+		}
 	case reflect.Int32:
 		converted, ok := newValue.(int64)
 		if !ok {
 			return errNotSupport
 		}
-		data.SetInt(converted)
+		if pointer {
+			data.Set(reflect.ValueOf(&converted))
+		} else {
+			data.SetInt(converted)
+		}
 	case reflect.Int64:
 		converted, ok := newValue.(int64)
 		if !ok {
 			return errNotSupport
 		}
-		data.SetInt(converted)
+		if pointer {
+			data.Set(reflect.ValueOf(&converted))
+		} else {
+			data.SetInt(converted)
+		}
 	case reflect.Uint:
 		converted, ok := newValue.(float64)
 		if !ok {
 			return errNotSupport
 		}
-		data.SetUint(uint64(converted))
+		if pointer {
+			data.Set(reflect.ValueOf(&converted))
+		} else {
+			data.SetUint(uint64(converted))
+		}
 	case reflect.Uint8:
 		converted, ok := newValue.(float64)
 		if !ok {
 			return errNotSupport
 		}
-		data.SetUint(uint64(converted))
+		if pointer {
+			data.Set(reflect.ValueOf(&converted))
+		} else {
+			data.SetUint(uint64(converted))
+		}
 	case reflect.Uint16:
 		converted, ok := newValue.(float64)
 		if !ok {
 			return errNotSupport
 		}
-		data.SetUint(uint64(converted))
+		if pointer {
+			data.Set(reflect.ValueOf(&converted))
+		} else {
+			data.SetUint(uint64(converted))
+		}
 	case reflect.Uint32:
 		converted, ok := newValue.(float64)
 		if !ok {
 			return errNotSupport
 		}
-		data.SetUint(uint64(converted))
+		if pointer {
+			data.Set(reflect.ValueOf(&converted))
+		} else {
+			data.SetUint(uint64(converted))
+		}
 	case reflect.Uint64:
 		converted, ok := newValue.(float64)
 		if !ok {
 			return errNotSupport
 		}
-		data.SetUint(uint64(converted))
+		if pointer {
+			data.Set(reflect.ValueOf(&converted))
+		} else {
+			data.SetUint(uint64(converted))
+		}
 	case reflect.Float32:
 		converted, ok := newValue.(float64)
 		if !ok {
 			return errNotSupport
 		}
-		data.SetFloat(float64(converted))
+		if pointer {
+			data.Set(reflect.ValueOf(&converted))
+		} else {
+			data.SetFloat(float64(converted))
+		}
 	case reflect.Float64:
 		converted, ok := newValue.(float64)
 		if !ok {
 			return errNotSupport
 		}
-		data.SetFloat(converted)
+		if pointer {
+			data.Set(reflect.ValueOf(&converted))
+		} else {
+			data.SetFloat(converted)
+		}
 	case reflect.String:
 		converted, ok := newValue.(string)
 		if !ok {
 			return errNotSupport
 		}
-		data.SetString(converted)
+		if pointer {
+			data.Set(reflect.ValueOf(&converted))
+		} else {
+			data.SetString(converted)
+		}
 	case reflect.Bool:
 		converted, ok := newValue.(bool)
 		if !ok {
 			return errNotSupport
 		}
-		data.SetBool(converted)
+		if pointer {
+			data.Set(reflect.ValueOf(&converted))
+		} else {
+			data.SetBool(converted)
+		}
 	case reflect.Complex64:
 		converted, ok := newValue.(complex128)
 		if !ok {
 			return errNotSupport
 		}
-		data.SetComplex(complex128(complex64(converted)))
+		if pointer {
+			data.Set(reflect.ValueOf(&converted))
+		} else {
+			data.SetComplex(complex128(complex64(converted)))
+		}
 	case reflect.Complex128:
 		converted, ok := newValue.(complex128)
 		if !ok {
 			return errNotSupport
 		}
-		data.SetComplex(converted)
+		if pointer {
+			data.Set(reflect.ValueOf(&converted))
+		} else {
+			data.SetComplex(converted)
+		}
 	case reflect.Interface:
 		data.Set(reflect.ValueOf(newValue))
 	default:
