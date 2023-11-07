@@ -2,6 +2,7 @@ package map_validator
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"reflect"
 )
@@ -24,6 +25,12 @@ func (state *dataState) Load(data map[string]interface{}) *finalOperation {
 }
 
 func (state *dataState) LoadJsonHttp(r *http.Request) (*finalOperation, error) {
+	if state == nil || state.data == nil {
+		return nil, errors.New("no data to Load because last progress is error")
+	}
+	if r == nil {
+		return nil, errors.New("no data to Load")
+	}
 	var mapData map[string]interface{}
 	err := json.NewDecoder(r.Body).Decode(&mapData)
 	if err != nil {
@@ -37,6 +44,12 @@ func (state *dataState) LoadJsonHttp(r *http.Request) (*finalOperation, error) {
 }
 
 func (state *dataState) LoadFormHttp(r *http.Request) (*finalOperation, error) {
+	if state == nil || state.data == nil {
+		return nil, errors.New("no data to Load because last progress is error")
+	}
+	if r == nil {
+		return nil, errors.New("no data to Load")
+	}
 	var mapData map[string]interface{}
 	allowType := []reflect.Kind{reflect.String, reflect.Int, reflect.Bool}
 	for key, rule := range state.rules {
@@ -74,6 +87,9 @@ func (state *dataState) LoadFormHttp(r *http.Request) (*finalOperation, error) {
 }
 
 func (state *finalOperation) RunValidate() (*extraOperation, error) {
+	if state == nil || state.data == nil {
+		return nil, errors.New("no data to Validate because last progress is error")
+	}
 	for key, validationData := range state.rules {
 		_, err := validate(key, state.data, validationData)
 		if err != nil {
@@ -84,6 +100,10 @@ func (state *finalOperation) RunValidate() (*extraOperation, error) {
 }
 
 func (state *extraOperation) Bind(i interface{}) error {
+	if state == nil || state.data == nil {
+		return errors.New("no data to Bind because last progress is error")
+	}
+	allKeysInMap := getAllkeys(state.data)
 	val := reflect.ValueOf(i)
 	if val.Kind() != reflect.Ptr || val.Elem().Kind() != reflect.Struct {
 		panic("need struct pointer!")
@@ -95,8 +115,11 @@ func (state *extraOperation) Bind(i interface{}) error {
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
 		tag := field.Tag.Get("map_validator")
+		if !isDataInList[string](tag, allKeysInMap) {
+			continue
+		}
 
-		if tag == "" || !field.IsExported() {
+		if tag == "" || !field.IsExported() || state.data[tag] == nil {
 			continue
 		}
 
