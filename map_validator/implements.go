@@ -104,14 +104,20 @@ func (state *finalOperation) RunValidate() (*extraOperation, error) {
 			return nil, err
 		}
 	}
-	return &extraOperation{state}, nil
+	return &extraOperation{
+		rules:      state.rules,
+		loadedFrom: &state.loadedFrom,
+		data:       &state.data,
+	}, nil
 }
 
 func (state *extraOperation) Bind(i interface{}) error {
+	var data map[string]interface{}
+	data = *state.data // this for memory allocation purpose
 	if state == nil || state.data == nil {
 		return errors.New("no data to Bind because last progress is error")
 	}
-	allKeysInMap := getAllKeys(state.data)
+	allKeysInMap := getAllKeys(data)
 	val := reflect.ValueOf(i)
 	if val.Kind() != reflect.Ptr || val.Elem().Kind() != reflect.Struct {
 		panic("need struct pointer!")
@@ -127,24 +133,24 @@ func (state *extraOperation) Bind(i interface{}) error {
 			continue
 		}
 
-		if tag == "" || !field.IsExported() || state.data[tag] == nil {
+		if tag == "" || !field.IsExported() || data[tag] == nil {
 			continue
 		}
 
-		if field.Type.Kind() == reflect.Ptr && reflect.TypeOf(state.data[tag]).Kind() == field.Type.Elem().Kind() {
-			err := convertValue(state.data[tag], field.Type.Elem().Kind(), el.Field(i), true)
+		if field.Type.Kind() == reflect.Ptr && reflect.TypeOf(data[tag]).Kind() == field.Type.Elem().Kind() {
+			err := convertValue(data[tag], field.Type.Elem().Kind(), el.Field(i), true)
 			if err != nil {
 				return err
 			}
-		} else if field.Type.Kind() == reflect.TypeOf(state.data[tag]).Kind() &&
+		} else if field.Type.Kind() == reflect.TypeOf(data[tag]).Kind() &&
 			field.Type.Kind() != reflect.Struct {
-			err := convertValue(state.data[tag], field.Type.Kind(), el.Field(i), false)
+			err := convertValue(data[tag], field.Type.Kind(), el.Field(i), false)
 			if err != nil {
 				return err
 			}
 		} else if field.Type.Kind() == reflect.Interface {
-			if reflect.TypeOf(state.data[tag]).Kind() == reflect.Map {
-				err := convertValue(state.data[tag], field.Type.Kind(), el.Field(i), false)
+			if reflect.TypeOf(data[tag]).Kind() == reflect.Map {
+				err := convertValue(data[tag], field.Type.Kind(), el.Field(i), false)
 				if err != nil {
 					return err
 				}

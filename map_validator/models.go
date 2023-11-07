@@ -58,5 +58,7 @@ type finalOperation struct {
 }
 
 type extraOperation struct {
-	*finalOperation
+	rules      *map[string]Rules
+	loadedFrom *loadFromType
+	data       *map[string]interface{}
 }

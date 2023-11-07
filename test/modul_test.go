@@ -186,3 +186,19 @@ func TestInterfaceFieldBinding(t *testing.T) {
 		}
 	}
 }
+
+//func TestFilledAndNullField(t *testing.T) {
+//	payload := map[string]interface{}{"nama": "arian", "hoby": "Main PS bro", "umur": 1}
+//	validRole := map[string]map_validator.Rules{
+//		"nama":      {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
+//		"hoby":      {Type: reflect.String, Null: true},
+//		"umur":     {Type: reflect.Int, Null: false},
+//	}
+//
+//	check := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
+//	extraCheck, err := check.RunValidate()
+//	if err != nil {
+//		t.Errorf("Expected not have error, but got error : %s", err)
+//	}
+//	//extraCheck.RunValidate()
+//}
