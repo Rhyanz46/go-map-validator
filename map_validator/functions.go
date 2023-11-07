@@ -62,7 +62,7 @@ func isIPv4NetworkValid(ip string) bool {
 	return false
 }
 
-func validate(field string, dataTemp map[string]interface{}, validator Rules) (interface{}, error) {
+func validate(field string, dataTemp map[string]interface{}, validator Rules, dataFrom loadFromType) (interface{}, error) {
 	//var oldIntType reflect.Kind
 	data := dataTemp[field]
 
@@ -95,18 +95,22 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules) (i
 
 	// validatorType type validation
 	dataType := reflect.TypeOf(data).Kind()
-	//if validator.Type == reflect.Int {
-	//	validator.Type = reflect.Float64
-	//}
+	if dataFrom == fromHttpJson {
+		if isIntegerFamily(validator.Type) {
+			validator.Type = reflect.Float64
+		}
+	}
 
 	if dataType == reflect.Slice && !validator.Null && len(ToInterfaceSlice(data)) == 0 {
 		return nil, errors.New("you need to input validatorType in '" + field + "' field")
 	}
 
 	if !validator.UUID && !validator.IPV4 && dataType != validator.Type && !validator.UUIDToString && !validator.IPv4OptionalPrefix && !validator.Email && validator.Enum == nil && !validator.File && !validator.IPV4Network {
-		//if validator.Type == reflect.Float64 {
-		//	validator.Type = reflect.Int
-		//}
+		if dataFrom == fromHttpJson {
+			if isIntegerFamily(validator.Type) {
+				validator.Type = reflect.Int
+			}
+		}
 		return nil, errors.New("the field '" + field + "' should be '" + validator.Type.String() + "'")
 	}
 

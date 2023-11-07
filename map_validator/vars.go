@@ -7,3 +7,11 @@ var (
 	ErrInvalidFormat = errors.New("validatorType format invalid")
 	ErrUnsupportType = errors.New("type is not support")
 )
+
+type loadFromType int
+
+const (
+	fromHttpJson loadFromType = iota
+	fromHttpMultipartForm
+	fromMapString
+)

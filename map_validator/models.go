@@ -49,7 +49,8 @@ type ruleState struct {
 
 type dataState struct {
 	*ruleState
-	data map[string]interface{}
+	loadedFrom loadFromType
+	data       map[string]interface{}
 }
 
 type finalOperation struct {

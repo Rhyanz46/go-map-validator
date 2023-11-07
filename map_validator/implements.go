@@ -21,6 +21,7 @@ func (state *ruleState) SetRules(validations map[string]Rules) *dataState {
 
 func (state *dataState) Load(data map[string]interface{}) *finalOperation {
 	state.data = data
+	state.loadedFrom = fromMapString
 	return &finalOperation{state}
 }
 
@@ -40,6 +41,7 @@ func (state *dataState) LoadJsonHttp(r *http.Request) (*finalOperation, error) {
 		return nil, ErrInvalidFormat
 	}
 	state.data = mapData
+	state.loadedFrom = fromHttpJson
 	return &finalOperation{state}, nil
 }
 
@@ -83,6 +85,7 @@ func (state *dataState) LoadFormHttp(r *http.Request) (*finalOperation, error) {
 		}
 	}
 	state.data = mapData
+	state.loadedFrom = fromHttpMultipartForm
 	return &finalOperation{state}, nil
 }
 
@@ -91,7 +94,7 @@ func (state *finalOperation) RunValidate() (*extraOperation, error) {
 		return nil, errors.New("no data to Validate because last progress is error")
 	}
 	for key, validationData := range state.rules {
-		_, err := validate(key, state.data, validationData)
+		_, err := validate(key, state.data, validationData, state.loadedFrom)
 		if err != nil {
 			return nil, err
 		}
