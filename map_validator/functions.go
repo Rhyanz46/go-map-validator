@@ -103,6 +103,9 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	}
 
 	if dataType != validator.Type && !customData && !handleIntOnHttpJson {
+		if dataFrom == fromHttpJson && isIntegerFamily(validator.Type) {
+			validator.Type = reflect.Int
+		}
 		return nil, errors.New("the field '" + field + "' should be '" + validator.Type.String() + "'")
 	}
 

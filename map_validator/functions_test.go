@@ -285,6 +285,17 @@ func TestIntFamily(t *testing.T) {
 		t.Errorf("Test case 1 Error : %v", err)
 	}
 
+	payload = map[string]interface{}{"power": "133.3", "harga": 1.3}
+	_, err = validate(
+		"power", payload, Rules{
+			Type: reflect.Int16,
+		}, fromHttpJson,
+	)
+	expected := "the field 'power' should be 'int'"
+	if err.Error() != expected {
+		t.Errorf("Expected : %s But you got : %s", expected, err)
+	}
+
 	_, err = validate(
 		"harga", payload, Rules{
 			Type: reflect.Float64,
