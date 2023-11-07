@@ -25,7 +25,7 @@ func (state *dataState) Load(data map[string]interface{}) *finalOperation {
 }
 
 func (state *dataState) LoadJsonHttp(r *http.Request) (*finalOperation, error) {
-	if state == nil || state.data == nil {
+	if state == nil {
 		return nil, errors.New("no data to Load because last progress is error")
 	}
 	if r == nil {
@@ -44,7 +44,7 @@ func (state *dataState) LoadJsonHttp(r *http.Request) (*finalOperation, error) {
 }
 
 func (state *dataState) LoadFormHttp(r *http.Request) (*finalOperation, error) {
-	if state == nil || state.data == nil {
+	if state == nil {
 		return nil, errors.New("no data to Load because last progress is error")
 	}
 	if r == nil {
