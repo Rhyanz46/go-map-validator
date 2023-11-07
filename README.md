@@ -98,6 +98,7 @@ if testBind.JK != payload["jenis_kelamin"] {
 
 ## Road Map
 - avoiding same value in some field
+  - ex case : `old_password` and `new_password`
 - get from urls params http
 - validation for `base64`
 - handle file size on multipart
