@@ -14,15 +14,16 @@ func NewValidateBuilder() *ruleState {
 func (state *ruleState) SetRules(validations map[string]Rules) *dataState {
 	state.rules = validations
 	return &dataState{
-		ruleState: state,
-		data:      nil,
+		rules: &state.rules,
 	}
 }
 
 func (state *dataState) Load(data map[string]interface{}) *finalOperation {
-	state.data = data
-	state.loadedFrom = fromMapString
-	return &finalOperation{state}
+	return &finalOperation{
+		rules:      state.rules,
+		loadedFrom: fromMapString,
+		data:       data,
+	}
 }
 
 func (state *dataState) LoadJsonHttp(r *http.Request) (*finalOperation, error) {
@@ -40,9 +41,11 @@ func (state *dataState) LoadJsonHttp(r *http.Request) (*finalOperation, error) {
 		}
 		return nil, ErrInvalidFormat
 	}
-	state.data = mapData
-	state.loadedFrom = fromHttpJson
-	return &finalOperation{state}, nil
+	return &finalOperation{
+		rules:      state.rules,
+		loadedFrom: fromHttpJson,
+		data:       mapData,
+	}, nil
 }
 
 func (state *dataState) LoadFormHttp(r *http.Request) (*finalOperation, error) {
@@ -54,7 +57,7 @@ func (state *dataState) LoadFormHttp(r *http.Request) (*finalOperation, error) {
 	}
 	var mapData map[string]interface{}
 	allowType := []reflect.Kind{reflect.String, reflect.Int, reflect.Bool}
-	for key, rule := range state.rules {
+	for key, rule := range *state.rules {
 		var isAllowType bool
 		if rule.File {
 			file, fileInfo, err := r.FormFile(key)
@@ -84,16 +87,18 @@ func (state *dataState) LoadFormHttp(r *http.Request) (*finalOperation, error) {
 			}
 		}
 	}
-	state.data = mapData
-	state.loadedFrom = fromHttpMultipartForm
-	return &finalOperation{state}, nil
+	return &finalOperation{
+		rules:      state.rules,
+		loadedFrom: fromHttpMultipartForm,
+		data:       mapData,
+	}, nil
 }
 
 func (state *finalOperation) RunValidate() (*extraOperation, error) {
 	if state == nil || state.data == nil {
 		return nil, errors.New("no data to Validate because last progress is error")
 	}
-	for key, validationData := range state.rules {
+	for key, validationData := range *state.rules {
 		_, err := validate(key, state.data, validationData, state.loadedFrom)
 		if err != nil {
 			return nil, err
