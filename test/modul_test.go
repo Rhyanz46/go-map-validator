@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TexstMultipleValidation(t *testing.T) {
+func TestMultipleValidation(t *testing.T) {
 	type Data struct {
 		JK      string `map_validator:"jenis_kelamin"`
 		Hoby    string `map_validator:"hoby"`
@@ -24,7 +24,10 @@ func TexstMultipleValidation(t *testing.T) {
 	}
 	payload := map[string]interface{}{"jenis_kelamin": "laki-laki", "hoby": "Main PS bro", "umur": 1, "menikah": true}
 	notFullPayload := map[string]interface{}{"jenis_kelamin": "laki-laki", "hoby": "Main PS bro", "umur": 1}
-	check := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
+	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+	}
 	extraCheck, err := check.RunValidate()
 	if err != nil {
 		t.Errorf("Expected not have error, but got error : %s", err)
@@ -43,11 +46,14 @@ func TexstMultipleValidation(t *testing.T) {
 		t.Errorf("Expected : %s But you got : %s", payload["jenis_kelamin"], testBind.JK)
 	}
 
-	check = map_validator.NewValidateBuilder().SetRules(map[string]map_validator.Rules{
+	check, err = map_validator.NewValidateBuilder().SetRules(map[string]map_validator.Rules{
 		"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
 		"hoby":          {Type: reflect.Int, Null: false},
 		"menikah":       {Type: reflect.Bool, Null: false},
 	}).Load(payload)
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+	}
 	_, err = check.RunValidate()
 	if err == nil {
 		t.Errorf("Expected have an error, but you got no error : %s", err)
@@ -58,7 +64,10 @@ func TexstMultipleValidation(t *testing.T) {
 		}
 	}
 
-	check = map_validator.NewValidateBuilder().SetRules(validRole).Load(notFullPayload)
+	check, err = map_validator.NewValidateBuilder().SetRules(validRole).Load(notFullPayload)
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+	}
 	extraCheck, err = check.RunValidate()
 	expected := "we need 'menikah' field"
 	if err.Error() != expected {
@@ -81,7 +90,10 @@ func TexstMultipleValidation(t *testing.T) {
 		t.Errorf("Expected : '' But you got : %s", testBind.JK)
 	}
 
-	check = map_validator.NewValidateBuilder().SetRules(validRoleOptionalMenikah).Load(notFullPayload)
+	check, err = map_validator.NewValidateBuilder().SetRules(validRoleOptionalMenikah).Load(notFullPayload)
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+	}
 	extraCheck, err = check.RunValidate()
 	if err != nil {
 		t.Errorf("Expected not have error, but got error : %s", err)
@@ -104,7 +116,7 @@ func TexstMultipleValidation(t *testing.T) {
 	}
 }
 
-func TexstPointerFieldBinding(t *testing.T) {
+func TestPointerFieldBinding(t *testing.T) {
 	payload := map[string]interface{}{"jenis_kelamin": "laki-laki", "hoby": "Main PS bro", "umur": 1, "menikah": true}
 	type Data struct {
 		JK      string  `map_validator:"jenis_kelamin"`
@@ -117,7 +129,10 @@ func TexstPointerFieldBinding(t *testing.T) {
 		"menikah":       {Type: reflect.Bool, Null: false},
 	}
 
-	check := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
+	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+	}
 	extraCheck, err := check.RunValidate()
 	if err != nil {
 		t.Errorf("Expected not have error, but got error : %s", err)
@@ -158,7 +173,10 @@ func TestInterfaceFieldBinding(t *testing.T) {
 		"list_data":     {IsMapInterface: true},
 	}
 
-	check := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
+	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+	}
 	extraCheck, err := check.RunValidate()
 	if err != nil {
 		t.Errorf("Expected not have error, but got error : %s", err)
@@ -194,7 +212,10 @@ func TestFilledAndNullField(t *testing.T) {
 		"hoby": {Type: reflect.String, Null: true},
 		"umur": {Type: reflect.Int, Null: false},
 	}
-	check := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
+	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+	}
 	extraCheck, err := check.RunValidate()
 	if err != nil {
 		t.Errorf("Expected not have error, but got error : %s", err)
@@ -216,7 +237,10 @@ func TestGetMapData(t *testing.T) {
 		"hoby": {Type: reflect.String, Null: true},
 		"umur": {Type: reflect.Int, Null: false},
 	}
-	check := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
+	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+	}
 	extraCheck, err := check.RunValidate()
 	if err != nil {
 		t.Errorf("Expected not have error, but got error : %s", err)
@@ -226,5 +250,24 @@ func TestGetMapData(t *testing.T) {
 		if !isDataInList(key, expectedKeys) {
 			t.Errorf("Key is not Expected : %v", key)
 		}
+	}
+}
+
+func TestStrict(t *testing.T) {
+	payload := map[string]interface{}{"nama": "arian", "umur": 1, "favorite": "coklat"}
+	validRole := map[string]map_validator.Rules{
+		"nama": {Type: reflect.String},
+		"hoby": {Type: reflect.String, Null: true},
+		"umur": {Type: reflect.Int, Null: false},
+	}
+	check, err := map_validator.NewValidateBuilder().StrictKeys().SetRules(validRole).Load(payload)
+	expected := "'favorite' is not allowed key"
+	if err.Error() != expected {
+		t.Errorf("Expected %s, but we got : %s", expected, err)
+	}
+	expected = "no data to Validate because last progress is error"
+	_, err = check.RunValidate()
+	if err.Error() != expected {
+		t.Errorf("Expected %s, but we got : %s", expected, err)
 	}
 }

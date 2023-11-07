@@ -3,6 +3,7 @@ package map_validator
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"reflect"
 )
@@ -12,18 +13,45 @@ func NewValidateBuilder() *ruleState {
 }
 
 func (state *ruleState) SetRules(validations map[string]Rules) *dataState {
+	if len(validations) == 0 {
+		panic("you need to set roles")
+	}
 	state.rules = validations
 	return &dataState{
-		rules: &state.rules,
+		rules:              &state.rules,
+		strictAllowedValue: state.strictAllowedValue,
 	}
 }
 
-func (state *dataState) Load(data map[string]interface{}) *finalOperation {
+func (state *ruleState) StrictKeys() *ruleState {
+	state.strictAllowedValue = true
+	return state
+}
+
+func (state *dataState) checkStrictKeys(data map[string]interface{}) error {
+	var allowedKeys []string
+	keys := getAllKeys(data)
+	for key, _ := range *state.rules {
+		allowedKeys = append(allowedKeys, key)
+	}
+	for _, key := range keys {
+		if !isDataInList(key, allowedKeys) {
+			return errors.New(fmt.Sprintf("'%s' is not allowed key", key))
+		}
+	}
+	return nil
+}
+func (state *dataState) Load(data map[string]interface{}) (*finalOperation, error) {
+	if state.strictAllowedValue {
+		if err := state.checkStrictKeys(data); err != nil {
+			return nil, err
+		}
+	}
 	return &finalOperation{
 		rules:      state.rules,
 		loadedFrom: fromMapString,
 		data:       data,
-	}
+	}, nil
 }
 
 func (state *dataState) LoadJsonHttp(r *http.Request) (*finalOperation, error) {
@@ -40,6 +68,11 @@ func (state *dataState) LoadJsonHttp(r *http.Request) (*finalOperation, error) {
 			return nil, ErrNoData
 		}
 		return nil, ErrInvalidFormat
+	}
+	if state.strictAllowedValue {
+		if err := state.checkStrictKeys(mapData); err != nil {
+			return nil, err
+		}
 	}
 	return &finalOperation{
 		rules:      state.rules,
@@ -85,6 +118,11 @@ func (state *dataState) LoadFormHttp(r *http.Request) (*finalOperation, error) {
 			} else {
 				mapData[key] = value
 			}
+		}
+	}
+	if state.strictAllowedValue {
+		if err := state.checkStrictKeys(mapData); err != nil {
+			return nil, err
 		}
 	}
 	return &finalOperation{

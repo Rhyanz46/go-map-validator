@@ -44,11 +44,13 @@ type FileRequest struct {
 }
 
 type ruleState struct {
-	rules map[string]Rules
+	rules              map[string]Rules
+	strictAllowedValue bool
 }
 
 type dataState struct {
-	rules *map[string]Rules
+	rules              *map[string]Rules
+	strictAllowedValue bool
 }
 
 type finalOperation struct {

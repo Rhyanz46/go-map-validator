@@ -7,10 +7,10 @@ import (
 
 func (state *extraOperation) Bind(i interface{}) error {
 	var data map[string]interface{}
-	data = *state.data // this for memory allocation purpose
 	if state == nil || state.data == nil {
 		return errors.New("no data to Bind because last progress is error")
 	}
+	data = *state.data // this for memory allocation purpose
 	allKeysInMap := getAllKeys(data)
 	val := reflect.ValueOf(i)
 	if val.Kind() != reflect.Ptr || val.Elem().Kind() != reflect.Struct {
