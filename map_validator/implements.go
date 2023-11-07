@@ -32,6 +32,7 @@ func (state *dataState) LoadJsonHttp(r *http.Request) (*finalOperation, error) {
 		}
 		return nil, ErrInvalidFormat
 	}
+	state.data = mapData
 	return &finalOperation{state}, nil
 }
 
@@ -68,6 +69,7 @@ func (state *dataState) LoadFormHttp(r *http.Request) (*finalOperation, error) {
 			}
 		}
 	}
+	state.data = mapData
 	return &finalOperation{state}, nil
 }
 
