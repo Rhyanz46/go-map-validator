@@ -283,9 +283,8 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules) (i
 	return data, nil
 }
 
-func ToPointer[T validatorType](data T) (res *T) {
-	res = &data
-	return
+func SetTotal(total int) *int {
+	return &total
 }
 
 func ToInterfaceSlice(slice interface{}) []interface{} {

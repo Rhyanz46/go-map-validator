@@ -90,7 +90,7 @@ func TestValidateStringMaxLength(t *testing.T) {
 
 	validator := Rules{
 		Type: reflect.String,
-		Max:  ToPointer[int](5),
+		Max:  SetTotal(5),
 	}
 
 	_, err := validate("field1", payload, validator)
@@ -112,7 +112,7 @@ func TestValidateStringMinLength(t *testing.T) {
 
 	validator := Rules{
 		Type: reflect.String,
-		Min:  ToPointer[int](5),
+		Min:  SetTotal(5),
 	}
 
 	_, err := validate("field1", payload, validator)
