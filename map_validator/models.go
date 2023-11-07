@@ -58,7 +58,9 @@ type finalOperation struct {
 }
 
 type extraOperation struct {
-	rules      *map[string]Rules
-	loadedFrom *loadFromType
-	data       *map[string]interface{}
+	rules        *map[string]Rules
+	loadedFrom   *loadFromType
+	data         *map[string]interface{}
+	filledFields []string
+	nullFields   []string
 }

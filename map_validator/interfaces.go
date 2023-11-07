@@ -22,4 +22,6 @@ type finalOperationType interface {
 
 type extraOperationType interface {
 	Bind(i interface{}) error
+	GetFilledField() []string
+	GetNullField() []string
 }
