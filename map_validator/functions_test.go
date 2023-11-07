@@ -234,3 +234,25 @@ func TestEnumFieldCheck(t *testing.T) {
 	}
 
 }
+
+func TestIntFamily(t *testing.T) {
+	payload := map[string]interface{}{"umur": 1, "harga": 1.3}
+	_, err := validate(
+		"umur", payload, Rules{
+			Type: reflect.Int,
+		},
+	)
+	if err != nil {
+		t.Errorf("Test case 1 Error : %v", err)
+	}
+
+	_, err = validate(
+		"harga", payload, Rules{
+			Type: reflect.Float64,
+		},
+	)
+	if err != nil {
+		t.Errorf("Test case 2 Error : %v", err)
+	}
+
+}
