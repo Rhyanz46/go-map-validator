@@ -265,4 +265,33 @@ func TestIntFamily(t *testing.T) {
 		t.Errorf("Test case 2 Error : %v", err)
 	}
 
+	payload = map[string]interface{}{"power": 133.3, "harga": 1.3}
+	_, err = validate(
+		"power", payload, Rules{
+			Type: reflect.Int,
+		}, fromHttpJson,
+	)
+	if err != nil {
+		t.Errorf("Test case 1 Error : %v", err)
+	}
+
+	payload = map[string]interface{}{"power": 133.3, "harga": 1.3}
+	_, err = validate(
+		"power", payload, Rules{
+			Type: reflect.Int16,
+		}, fromHttpJson,
+	)
+	if err != nil {
+		t.Errorf("Test case 1 Error : %v", err)
+	}
+
+	_, err = validate(
+		"harga", payload, Rules{
+			Type: reflect.Float64,
+		}, fromHttpJson,
+	)
+	if err != nil {
+		t.Errorf("Test case 2 Error : %v", err)
+	}
+
 }

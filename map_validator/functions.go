@@ -95,23 +95,14 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 
 	// validatorType type validation
 	dataType := reflect.TypeOf(data).Kind()
+	handleIntOnHttpJson := dataFrom == fromHttpJson && isIntegerFamily(validator.Type) && isIntegerFamily(dataType)
 	customData := !(!validator.UUID && !validator.IPV4 && !validator.UUIDToString && !validator.IPv4OptionalPrefix && !validator.Email && validator.Enum == nil && !validator.File && !validator.IPV4Network)
-	if dataFrom == fromHttpJson {
-		if isIntegerFamily(validator.Type) && customData {
-			validator.Type = reflect.Float64
-		}
-	}
 
 	if dataType == reflect.Slice && !validator.Null && len(ToInterfaceSlice(data)) == 0 {
 		return nil, errors.New("you need to input validatorType in '" + field + "' field")
 	}
 
-	if dataType != validator.Type && !customData {
-		if dataFrom == fromHttpJson {
-			if isIntegerFamily(validator.Type) {
-				validator.Type = reflect.Int
-			}
-		}
+	if dataType != validator.Type && !customData && !handleIntOnHttpJson {
 		return nil, errors.New("the field '" + field + "' should be '" + validator.Type.String() + "'")
 	}
 
