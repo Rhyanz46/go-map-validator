@@ -476,7 +476,7 @@ func convertValue(newValue interface{}, kind reflect.Kind, data reflect.Value, p
 	return nil
 }
 
-func getAllkeys(data map[string]interface{}) (allKeysInMap []string) {
+func getAllKeys(data map[string]interface{}) (allKeysInMap []string) {
 	for key, _ := range data {
 		allKeysInMap = append(allKeysInMap, key)
 	}

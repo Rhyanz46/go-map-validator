@@ -106,7 +106,7 @@ func (state *extraOperation) Bind(i interface{}) error {
 	if state == nil || state.data == nil {
 		return errors.New("no data to Bind because last progress is error")
 	}
-	allKeysInMap := getAllkeys(state.data)
+	allKeysInMap := getAllKeys(state.data)
 	val := reflect.ValueOf(i)
 	if val.Kind() != reflect.Ptr || val.Elem().Kind() != reflect.Struct {
 		panic("need struct pointer!")
@@ -132,11 +132,17 @@ func (state *extraOperation) Bind(i interface{}) error {
 				return err
 			}
 		} else if field.Type.Kind() == reflect.TypeOf(state.data[tag]).Kind() &&
-			field.Type.Kind() != reflect.Interface &&
 			field.Type.Kind() != reflect.Struct {
 			err := convertValue(state.data[tag], field.Type.Kind(), el.Field(i), false)
 			if err != nil {
 				return err
+			}
+		} else if field.Type.Kind() == reflect.Interface {
+			if reflect.TypeOf(state.data[tag]).Kind() == reflect.Map {
+				err := convertValue(state.data[tag], field.Type.Kind(), el.Field(i), false)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
