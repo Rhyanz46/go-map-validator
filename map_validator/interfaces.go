@@ -7,14 +7,24 @@ type validatorType interface {
 }
 
 type setRoleOperationType interface {
-	SetRules(validations map[string]Rules) *dataState
-	StrictKeys() *ruleState
+	SetRules(validations map[string]Rules) *optionalRolesState
+	SetRule(validations Rules) *dataState
 }
 
 type loadOperationType interface {
 	LoadJsonHttp(r *http.Request) (*finalOperation, error)
-	LoadFormHttp(r *http.Request) (*finalOperation, error)
+	LoadMultiPartFormHttp(r *http.Request, resWriter http.ResponseWriter) (*finalOperation, error)
 	Load(data map[string]interface{}) (*finalOperation, error)
+}
+
+type loadOneValueOperationType interface {
+	Load(data interface{}) (*finalOperation, error)
+	LoadFromHttp(r *http.Request, resWriter http.ResponseWriter) (*finalOperation, error)
+}
+
+type optionalRulesOperationType interface {
+	StrictKeys() *optionalRolesState
+	Next() *dataState
 }
 
 type finalOperationType interface {

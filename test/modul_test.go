@@ -24,7 +24,7 @@ func TestMultipleValidation(t *testing.T) {
 	}
 	payload := map[string]interface{}{"jenis_kelamin": "laki-laki", "hoby": "Main PS bro", "umur": 1, "menikah": true}
 	notFullPayload := map[string]interface{}{"jenis_kelamin": "laki-laki", "hoby": "Main PS bro", "umur": 1}
-	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
+	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Next().Load(payload)
 	if err != nil {
 		t.Errorf("Expected not have error, but got error : %s", err)
 	}
@@ -50,7 +50,7 @@ func TestMultipleValidation(t *testing.T) {
 		"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
 		"hoby":          {Type: reflect.Int, Null: false},
 		"menikah":       {Type: reflect.Bool, Null: false},
-	}).Load(payload)
+	}).Next().Load(payload)
 	if err != nil {
 		t.Errorf("Expected not have error, but got error : %s", err)
 	}
@@ -64,7 +64,7 @@ func TestMultipleValidation(t *testing.T) {
 		}
 	}
 
-	check, err = map_validator.NewValidateBuilder().SetRules(validRole).Load(notFullPayload)
+	check, err = map_validator.NewValidateBuilder().SetRules(validRole).Next().Load(notFullPayload)
 	if err != nil {
 		t.Errorf("Expected not have error, but got error : %s", err)
 	}
@@ -90,7 +90,7 @@ func TestMultipleValidation(t *testing.T) {
 		t.Errorf("Expected : '' But you got : %s", testBind.JK)
 	}
 
-	check, err = map_validator.NewValidateBuilder().SetRules(validRoleOptionalMenikah).Load(notFullPayload)
+	check, err = map_validator.NewValidateBuilder().SetRules(validRoleOptionalMenikah).Next().Load(notFullPayload)
 	if err != nil {
 		t.Errorf("Expected not have error, but got error : %s", err)
 	}
@@ -129,7 +129,7 @@ func TestPointerFieldBinding(t *testing.T) {
 		"menikah":       {Type: reflect.Bool, Null: false},
 	}
 
-	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
+	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Next().Load(payload)
 	if err != nil {
 		t.Errorf("Expected not have error, but got error : %s", err)
 	}
@@ -173,7 +173,7 @@ func TestInterfaceFieldBinding(t *testing.T) {
 		"list_data":     {IsMapInterface: true},
 	}
 
-	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
+	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Next().Load(payload)
 	if err != nil {
 		t.Errorf("Expected not have error, but got error : %s", err)
 	}
@@ -212,7 +212,7 @@ func TestFilledAndNullField(t *testing.T) {
 		"hoby": {Type: reflect.String, Null: true},
 		"umur": {Type: reflect.Int, Null: false},
 	}
-	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
+	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Next().Load(payload)
 	if err != nil {
 		t.Errorf("Expected not have error, but got error : %s", err)
 	}
@@ -237,7 +237,7 @@ func TestGetMapData(t *testing.T) {
 		"hoby": {Type: reflect.String, Null: true},
 		"umur": {Type: reflect.Int, Null: false},
 	}
-	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
+	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Next().Load(payload)
 	if err != nil {
 		t.Errorf("Expected not have error, but got error : %s", err)
 	}
@@ -255,19 +255,37 @@ func TestGetMapData(t *testing.T) {
 
 func TestStrict(t *testing.T) {
 	payload := map[string]interface{}{"nama": "arian", "umur": 1, "favorite": "coklat"}
+	//payload := map[string]interface{}{"nama": "arian", "umur": 1}
 	validRole := map[string]map_validator.Rules{
 		"nama": {Type: reflect.String},
 		"hoby": {Type: reflect.String, Null: true},
 		"umur": {Type: reflect.Int, Null: false},
 	}
-	check, err := map_validator.NewValidateBuilder().StrictKeys().SetRules(validRole).Load(payload)
+	_, err := map_validator.NewValidateBuilder().SetRules(validRole).StrictKeys().Next().Load(payload)
 	expected := "'favorite' is not allowed key"
 	if err.Error() != expected {
 		t.Errorf("Expected %s, but we got : %s", expected, err)
 	}
-	expected = "no data to Validate because last progress is error"
-	_, err = check.RunValidate()
-	if err.Error() != expected {
-		t.Errorf("Expected %s, but we got : %s", expected, err)
+}
+
+func TestNotNullOnlyStrict(t *testing.T) {
+	payload := map[string]interface{}{"nama": "arian"}
+	validRole := map[string]map_validator.Rules{
+		"nama": {Type: reflect.String},
+		"hoby": {Type: reflect.String, Null: true},
+		"umur": {Type: reflect.Int, Null: false},
+	}
+	_, err := map_validator.NewValidateBuilder().SetRules(validRole).StrictKeys().Next().Load(payload)
+	if err != nil {
+		t.Errorf("Expected have an error, but you got no error : %s", err)
+	}
+}
+
+func TestOneValue(t *testing.T) {
+	payload := map[string]interface{}{"nama": "arian"}
+	validRole := map_validator.Rules{Type: reflect.String, Null: true}
+	_, err := map_validator.NewValidateBuilder().SetRule(validRole).Load(payload)
+	if err != nil {
+		t.Errorf("Expected have an error, but you got no error : %s", err)
 	}
 }

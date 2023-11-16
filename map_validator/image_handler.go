@@ -1,4 +1,4 @@
-package http_utils
+package map_validator
 
 import (
 	"bytes"

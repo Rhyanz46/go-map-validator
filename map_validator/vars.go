@@ -14,4 +14,15 @@ const (
 	fromHttpJson loadFromType = iota
 	fromHttpMultipartForm
 	fromMapString
+	fromOneValue
+)
+
+type FileType string
+
+const (
+	IMAGE    FileType = "image"
+	DOCUMENT          = "DOCUMENT"
+	PNG               = "png"
+	JPEG              = "jpeg"
+	// add more type
 )

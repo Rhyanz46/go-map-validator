@@ -1,4 +1,4 @@
-package http_utils
+package map_validator
 
 import (
 	"errors"
@@ -17,7 +17,7 @@ type FileResult struct {
 	Data      []byte
 }
 
-func GetFileFromHttp(body io.ReadCloser, resWriter http.ResponseWriter, options FileValidation) (FileResult, int, error) {
+func getFileFromHttp(body io.ReadCloser, resWriter http.ResponseWriter, options FileValidation) (FileResult, int, error) {
 	var extension FileType
 	var res FileResult
 	var valid bool

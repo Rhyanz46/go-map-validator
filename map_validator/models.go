@@ -23,7 +23,7 @@ type Rules struct {
 	NilIfNull          bool
 	IsMapInterface     bool
 	Email              bool
-	Enum               *EnumField[any] // new 🔥🔥🔥
+	Enum               *EnumField[any]
 	Type               reflect.Kind
 	Max                *int
 	Min                *int
@@ -44,23 +44,34 @@ type FileRequest struct {
 }
 
 type ruleState struct {
-	rules              map[string]Rules
-	strictAllowedValue bool
 }
 
 type dataState struct {
-	rules              *map[string]Rules
+	rules    *map[string]Rules
+	optional *optionalRolesState
+}
+
+type oneDataState struct {
+	rule *Rules
+}
+
+type optionalRolesState struct {
+	data               *dataState
 	strictAllowedValue bool
 }
 
 type finalOperation struct {
 	rules      *map[string]Rules
+	rule       *Rules
 	loadedFrom loadFromType
+	oneValue   bool
 	data       map[string]interface{}
 }
 
 type extraOperation struct {
 	rules        *map[string]Rules
+	rule         *Rules
+	oneValue     bool
 	loadedFrom   *loadFromType
 	data         *map[string]interface{}
 	filledFields []string
