@@ -96,7 +96,11 @@ if testBind.JK != payload["jenis_kelamin"] {
 - validate data from `http.Request` json/multipart
   - support file upload
 - enum value check
-- min/max data
+- min/max length data check
+- email field check
+- uuid field check
+- IPv4 field check
+- IPv4 Network check
 
 ## Road Map
 - avoiding same value in some field
@@ -107,3 +111,4 @@ if testBind.JK != payload["jenis_kelamin"] {
 - generate OpenAPI Spec
 - regex on string validation
 - image resolution validation
+- nested data
