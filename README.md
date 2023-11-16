@@ -95,6 +95,8 @@ if testBind.JK != payload["jenis_kelamin"] {
 - validate value in `map[string]interface{}` by keys
 - validate data from `http.Request` json/multipart
   - support file upload
+- enum value check
+- min/max data
 
 ## Road Map
 - avoiding same value in some field
@@ -103,3 +105,5 @@ if testBind.JK != payload["jenis_kelamin"] {
 - validation for `base64`
 - handle file size on multipart
 - generate OpenAPI Spec
+- regex on string validation
+- image resolution validation
