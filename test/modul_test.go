@@ -303,3 +303,27 @@ func TestOneValue(t *testing.T) {
 		t.Errorf("Expected %s, but you got no error : %s", expect, err)
 	}
 }
+
+func TestOneStringValue(t *testing.T) {
+	payload := "arian"
+	badPayload := 1
+	validRole := map_validator.Rules{Type: reflect.String, Null: true}
+	check, err := map_validator.NewValidateBuilder().SetRule(validRole).Load(badPayload)
+	if err != nil {
+		t.Errorf("Expected have an error, but you got no error : %s", err)
+	}
+	_, err = check.RunValidate()
+	expect := "the field 'data' should be 'string'"
+	if err.Error() != expect {
+		t.Errorf("Expected %s, but you got no error : %s", expect, err)
+	}
+
+	check, err = map_validator.NewValidateBuilder().SetRule(validRole).Load(payload)
+	if err != nil {
+		t.Errorf("Expected have an error, but you got no error : %s", err)
+	}
+	_, err = check.RunValidate()
+	if err != nil {
+		t.Errorf("Expected have an error, but you got no error : %s", err)
+	}
+}
