@@ -261,10 +261,15 @@ func TestStrict(t *testing.T) {
 		"hoby": {Type: reflect.String, Null: true},
 		"umur": {Type: reflect.Int, Null: false},
 	}
-	_, err := map_validator.NewValidateBuilder().SetRules(validRole).StrictKeys().Next().Load(payload)
+	check, err := map_validator.NewValidateBuilder().SetRules(validRole).StrictKeys().Next().Load(payload)
 	expected := "'favorite' is not allowed key"
 	if err.Error() != expected {
 		t.Errorf("Expected %s, but we got : %s", expected, err)
+	}
+	_, err = check.RunValidate()
+	expected = "no data to Validate because last progress is error"
+	if err.Error() != expected {
+		t.Errorf("Expected %s, but you got no error : %s", expected, err)
 	}
 }
 
@@ -273,9 +278,13 @@ func TestNotNullOnlyStrict(t *testing.T) {
 	validRole := map[string]map_validator.Rules{
 		"nama": {Type: reflect.String},
 		"hoby": {Type: reflect.String, Null: true},
-		"umur": {Type: reflect.Int, Null: false},
+		"umur": {Type: reflect.Int, Null: true},
 	}
-	_, err := map_validator.NewValidateBuilder().SetRules(validRole).StrictKeys().Next().Load(payload)
+	check, err := map_validator.NewValidateBuilder().SetRules(validRole).StrictKeys().Next().Load(payload)
+	if err != nil {
+		t.Errorf("Expected have an error, but you got no error : %s", err)
+	}
+	_, err = check.RunValidate()
 	if err != nil {
 		t.Errorf("Expected have an error, but you got no error : %s", err)
 	}
@@ -284,8 +293,13 @@ func TestNotNullOnlyStrict(t *testing.T) {
 func TestOneValue(t *testing.T) {
 	payload := map[string]interface{}{"nama": "arian"}
 	validRole := map_validator.Rules{Type: reflect.String, Null: true}
-	_, err := map_validator.NewValidateBuilder().SetRule(validRole).Load(payload)
+	check, err := map_validator.NewValidateBuilder().SetRule(validRole).Load(payload)
 	if err != nil {
 		t.Errorf("Expected have an error, but you got no error : %s", err)
+	}
+	_, err = check.RunValidate()
+	expect := "the field 'data' should be 'string'"
+	if err.Error() != expect {
+		t.Errorf("Expected %s, but you got no error : %s", expect, err)
 	}
 }
