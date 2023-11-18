@@ -3,9 +3,9 @@ package map_validator
 import "errors"
 
 var (
-	ErrNoData        = errors.New("no validatorType")
-	ErrInvalidFormat = errors.New("validatorType format invalid")
-	ErrUnsupportType = errors.New("type is not support")
+	ErrNoData            = errors.New("no validatorType")
+	ErrInvalidJsonFormat = errors.New("is not valid json")
+	ErrUnsupportType     = errors.New("type is not support")
 )
 
 type loadFromType int
