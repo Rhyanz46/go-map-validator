@@ -67,7 +67,7 @@ func (state *dataState) LoadJsonHttp(r *http.Request) (*finalOperation, error) {
 		if err.Error() == "EOF" {
 			return nil, ErrNoData
 		}
-		return nil, ErrInvalidFormat
+		return nil, ErrInvalidJsonFormat
 	}
 	if state.strictAllowedValue {
 		if err := state.checkStrictKeys(mapData); err != nil {
@@ -88,7 +88,7 @@ func (state *dataState) LoadFormHttp(r *http.Request) (*finalOperation, error) {
 	if r == nil {
 		return nil, errors.New("no data to Load")
 	}
-	var mapData map[string]interface{}
+	mapData := map[string]interface{}{}
 	allowType := []reflect.Kind{reflect.String, reflect.Int, reflect.Bool}
 	for key, rule := range *state.rules {
 		var isAllowType bool
