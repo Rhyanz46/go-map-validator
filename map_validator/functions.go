@@ -8,10 +8,21 @@ import (
 	"github.com/google/uuid"
 	"net"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"unicode/utf8"
 )
+
+func isValidUUID(uuid string) (result bool) {
+	//uuidPattern := regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$`)
+	uuidPattern := regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$`)
+	result = uuidPattern.MatchString(uuid)
+	if !result {
+		return
+	}
+	return true
+}
 
 func isEqualString(current, allowedField string) bool {
 	return current == allowedField
@@ -96,7 +107,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	// validatorType type validation
 	dataType := reflect.TypeOf(data).Kind()
 	handleIntOnHttpJson := dataFrom == fromHttpJson && isIntegerFamily(validator.Type) && isIntegerFamily(dataType)
-	customData := !(!validator.UUID && !validator.IPV4 && !validator.UUIDToString && !validator.IPv4OptionalPrefix && !validator.Email && validator.Enum == nil && !validator.File && !validator.IPV4Network)
+	customData := !(!validator.UUID && !validator.IPV4 && !validator.IPv4OptionalPrefix && !validator.Email && validator.Enum == nil && !validator.File && !validator.IPV4Network)
 
 	if dataType == reflect.Slice && !validator.Null && len(ToInterfaceSlice(data)) == 0 {
 		return nil, errors.New("you need to input validatorType in '" + field + "' field")
@@ -161,10 +172,6 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 		return data, nil
 	}
 
-	if validator.UUIDToString {
-		validator.UUID = true
-	}
-
 	if validator.UUID {
 		errMsg := errors.New("the field '" + field + "' it's not valid uuid")
 		stringUuid, ok := data.(string)
@@ -174,9 +181,6 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 		dataUuid, err := uuid.Parse(stringUuid)
 		if err != nil {
 			return nil, errMsg
-		}
-		if validator.UUIDToString {
-			return stringUuid, nil
 		}
 		return dataUuid, nil
 	}

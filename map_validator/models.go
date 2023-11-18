@@ -29,7 +29,6 @@ type Rules struct {
 	Min                *int
 	IfNull             interface{}
 	UUID               bool
-	UUIDToString       bool
 	IPV4               bool
 	IPV4Network        bool
 	IPv4OptionalPrefix bool
