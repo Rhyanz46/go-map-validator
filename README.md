@@ -1,4 +1,4 @@
-# simple validator for map value
+# simple validator using struct properties as rules
 
 You can integrate with all golang framework using `http.Request` interface
 
@@ -101,6 +101,10 @@ if testBind.JK != payload["jenis_kelamin"] {
 - uuid field check
 - IPv4 field check
 - IPv4 Network check
+- 
+
+## On Progress
+- validation for one data value only
 
 ## Road Map
 - avoiding same value in some field
@@ -108,7 +112,8 @@ if testBind.JK != payload["jenis_kelamin"] {
 - get from urls params http
 - validation for `base64`
 - handle file size on multipart
-- generate OpenAPI Spec
+- other package for generate OpenAPI Spec that support with this package
 - regex on string validation
 - image resolution validation
 - nested data
+
