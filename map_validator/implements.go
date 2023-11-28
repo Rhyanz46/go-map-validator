@@ -64,10 +64,10 @@ func (state *dataState) LoadJsonHttp(r *http.Request) (*finalOperation, error) {
 	var mapData map[string]interface{}
 	err := json.NewDecoder(r.Body).Decode(&mapData)
 	if err != nil {
-		if err.Error() == "EOF" {
-			return nil, ErrNoData
+		if err.Error() != "EOF" {
+			return nil, ErrInvalidJsonFormat
 		}
-		return nil, ErrInvalidJsonFormat
+		mapData = make(map[string]interface{})
 	}
 	if state.strictAllowedValue {
 		if err := state.checkStrictKeys(mapData); err != nil {
