@@ -1,8 +1,8 @@
 package map_validator
 
 import (
+	"encoding/json"
 	"errors"
-	"reflect"
 )
 
 func (state *extraOperation) Bind(i interface{}) error {
@@ -11,45 +11,54 @@ func (state *extraOperation) Bind(i interface{}) error {
 		return errors.New("no data to Bind because last progress is error")
 	}
 	data = *state.data // this for memory allocation purpose
-	allKeysInMap := getAllKeys(data)
-	val := reflect.ValueOf(i)
-	if val.Kind() != reflect.Ptr || val.Elem().Kind() != reflect.Struct {
-		panic("need struct pointer!")
+	//allKeysInMap := getAllKeys(data)
+	//val := reflect.ValueOf(i)
+	//if val.Kind() != reflect.Ptr || val.Elem().Kind() != reflect.Struct {
+	//	panic("need struct pointer!")
+	//}
+	//
+	//el := val.Elem()
+	//t := val.Elem().Type()
+
+	//for i := 0; i < t.NumField(); i++ {
+	//	field := t.Field(i)
+	//	tag := field.Tag.Get("map_validator")
+	//	if !isDataInList[string](tag, allKeysInMap) {
+	//		continue
+	//	}
+	//
+	//	if tag == "" || !field.IsExported() || data[tag] == nil {
+	//		continue
+	//	}
+	//
+	//	if field.Type.Kind() == reflect.Ptr && reflect.TypeOf(data[tag]).Kind() == field.Type.Elem().Kind() {
+	//		err := convertValue(data[tag], field.Type.Elem().Kind(), el.Field(i), true)
+	//		if err != nil {
+	//			return err
+	//		}
+	//	} else if field.Type.Kind() == reflect.TypeOf(data[tag]).Kind() &&
+	//		field.Type.Kind() != reflect.Struct {
+	//		err := convertValue(data[tag], field.Type.Kind(), el.Field(i), false)
+	//		if err != nil {
+	//			return err
+	//		}
+	//	} else if field.Type.Kind() == reflect.Interface {
+	//		if reflect.TypeOf(data[tag]).Kind() == reflect.Map {
+	//			err := convertValue(data[tag], field.Type.Kind(), el.Field(i), false)
+	//			if err != nil {
+	//				return err
+	//			}
+	//		}
+	//	}
+	//}
+
+	jsonStringData, err := json.Marshal(data)
+	if err != nil {
+		return err
 	}
-
-	el := val.Elem()
-	t := val.Elem().Type()
-
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
-		tag := field.Tag.Get("map_validator")
-		if !isDataInList[string](tag, allKeysInMap) {
-			continue
-		}
-
-		if tag == "" || !field.IsExported() || data[tag] == nil {
-			continue
-		}
-
-		if field.Type.Kind() == reflect.Ptr && reflect.TypeOf(data[tag]).Kind() == field.Type.Elem().Kind() {
-			err := convertValue(data[tag], field.Type.Elem().Kind(), el.Field(i), true)
-			if err != nil {
-				return err
-			}
-		} else if field.Type.Kind() == reflect.TypeOf(data[tag]).Kind() &&
-			field.Type.Kind() != reflect.Struct {
-			err := convertValue(data[tag], field.Type.Kind(), el.Field(i), false)
-			if err != nil {
-				return err
-			}
-		} else if field.Type.Kind() == reflect.Interface {
-			if reflect.TypeOf(data[tag]).Kind() == reflect.Map {
-				err := convertValue(data[tag], field.Type.Kind(), el.Field(i), false)
-				if err != nil {
-					return err
-				}
-			}
-		}
+	err = json.Unmarshal(jsonStringData, i)
+	if err != nil {
+		return err
 	}
 
 	return nil

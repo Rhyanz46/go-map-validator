@@ -8,9 +8,9 @@ import (
 
 func TestMultipleValidation(t *testing.T) {
 	type Data struct {
-		JK      string `map_validator:"jenis_kelamin"`
-		Hoby    string `map_validator:"hoby"`
-		Menikah bool   `map_validator:"menikah"`
+		JK      string `map_validator:"jenis_kelamin" json:"jenis_kelamin"`
+		Hoby    string `map_validator:"hoby" json:"hoby"`
+		Menikah bool   `map_validator:"menikah" json:"menikah"`
 	}
 	validRole := map[string]map_validator.Rules{
 		"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
@@ -119,9 +119,9 @@ func TestMultipleValidation(t *testing.T) {
 func TestPointerFieldBinding(t *testing.T) {
 	payload := map[string]interface{}{"jenis_kelamin": "laki-laki", "hoby": "Main PS bro", "umur": 1, "menikah": true}
 	type Data struct {
-		JK      string  `map_validator:"jenis_kelamin"`
-		Hoby    *string `map_validator:"hoby"`
-		Menikah bool    `map_validator:"menikah"`
+		JK      string  `map_validator:"jenis_kelamin" json:"jenis_kelamin"`
+		Hoby    *string `map_validator:"hoby" json:"hoby"`
+		Menikah bool    `map_validator:"menikah" json:"menikah"`
 	}
 	validRole := map[string]map_validator.Rules{
 		"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
@@ -158,13 +158,13 @@ func TestPointerFieldBinding(t *testing.T) {
 
 func TestInterfaceFieldBinding(t *testing.T) {
 	var obj interface{}
-	obj = map[string]interface{}{"nama": "arian", "kelas": 1}
+	obj = map[string]interface{}{"nama": "arian", "kelas": float64(1)}
 	payload := map[string]interface{}{"jenis_kelamin": "laki-laki", "hoby": "Main PS bro", "umur": 1, "menikah": true, "list_data": obj}
 	type Data struct {
-		JK       string      `map_validator:"jenis_kelamin"`
-		Hoby     *string     `map_validator:"hoby"`
-		Menikah  bool        `map_validator:"menikah"`
-		ListData interface{} `map_validator:"list_data"`
+		JK       string      `map_validator:"jenis_kelamin" json:"jenis_kelamin"`
+		Hoby     *string     `map_validator:"hoby" json:"hoby"`
+		Menikah  bool        `map_validator:"menikah" json:"menikah"`
+		ListData interface{} `map_validator:"list_data" json:"list_data"`
 	}
 	validRole := map[string]map_validator.Rules{
 		"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
