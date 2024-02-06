@@ -101,7 +101,7 @@ if testBind.JK != payload["jenis_kelamin"] {
 - uuid field check
 - IPv4 field check
 - IPv4 Network check
-- 
+- regex on string validation 
 
 ## On Progress
 - validation for one data value only
@@ -113,7 +113,5 @@ if testBind.JK != payload["jenis_kelamin"] {
 - validation for `base64`
 - handle file size on multipart
 - other package for generate OpenAPI Spec that support with this package
-- regex on string validation
 - image resolution validation
 - nested data
-

@@ -34,6 +34,7 @@ type Rules struct {
 	IPV4Network        bool
 	IPv4OptionalPrefix bool
 	File               bool
+	RegexString        string
 
 	CustomMsg CustomMsg // will support soon
 }
