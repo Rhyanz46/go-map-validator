@@ -74,14 +74,14 @@ func buildMessage(msg string, meta MessageMeta) error {
 		}
 	}
 	if strings.Contains(msg, expectedTypeVar) {
-		v := *meta.ExpectedType
 		if meta.ExpectedType != nil {
+			v := *meta.ExpectedType
 			msg = strings.ReplaceAll(msg, expectedTypeVar, v.String())
 		}
 	}
 	if strings.Contains(msg, actualTypeVar) {
-		v := *meta.ActualType
 		if meta.ActualType != nil {
+			v := *meta.ActualType
 			msg = strings.ReplaceAll(msg, actualTypeVar, v.String())
 		}
 	}
