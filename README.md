@@ -4,34 +4,43 @@ You can integrate with all golang framework using `http.Request` interface
 
 examples : https://github.com/Rhyanz46/go-map-validator-examples
 
-### Install 
+### Install
+
 ```shell
 go get github.com/Rhyanz46/go-map-validator/map_validator
 ```
 
 ## Features
+
 - validate value in `map[string]interface{}` by keys
 - validate data from `http.Request` json/multipart
-  - support file upload
+    - support file upload
 - enum value check
 - min/max length data check
 - email field check
 - uuid field check
 - IPv4 field check
 - IPv4 Network check
--
+- regex on string validation
+- custom message :
+    - on invalid regex message : ✅
+    - on null data message : ❌
+    - on max data message : ❌
+    - on type not match message : ❌
+    - on enum value not match : ❌
 
 ## On Progress
+
 - validation for one data value only
 
 ## Road Map
+
 - avoiding same value in some field
-  - ex case : `old_password` and `new_password`
+    - ex case : `old_password` and `new_password`
 - get from urls params http
 - validation for `base64`
 - handle file size on multipart
-- other package for generate OpenAPI Spec that support with this package
-- regex on string validation
+- extension for generate OpenAPI Spec that support with this package
 - image resolution validation
 - nested data
 

@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"net"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -62,6 +63,14 @@ func isIPv4NetworkValid(ip string) bool {
 	return false
 }
 
+func buildMessage(msg string, meta MessageMeta) error {
+	field := "${field}"
+	if strings.Contains(msg, field) {
+		msg = strings.ReplaceAll(msg, field, meta.Field)
+	}
+	return errors.New(msg)
+}
+
 func validate(field string, dataTemp map[string]interface{}, validator Rules, dataFrom loadFromType) (interface{}, error) {
 	//var oldIntType reflect.Kind
 	data := dataTemp[field]
@@ -96,7 +105,15 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	// validatorType type validation
 	dataType := reflect.TypeOf(data).Kind()
 	handleIntOnHttpJson := dataFrom == fromHttpJson && isIntegerFamily(validator.Type) && isIntegerFamily(dataType)
-	customData := !(!validator.UUID && !validator.IPV4 && !validator.UUIDToString && !validator.IPv4OptionalPrefix && !validator.Email && validator.Enum == nil && !validator.File && !validator.IPV4Network)
+	customData := !(!validator.UUID &&
+		!validator.IPV4 &&
+		!validator.UUIDToString &&
+		!validator.IPv4OptionalPrefix &&
+		!validator.Email &&
+		validator.Enum == nil &&
+		!validator.File &&
+		!validator.IPV4Network &&
+		validator.RegexString == "")
 
 	if dataType == reflect.Slice && !validator.Null && len(ToInterfaceSlice(data)) == 0 {
 		return nil, errors.New("you need to input validatorType in '" + field + "' field")
@@ -111,6 +128,23 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 
 	if validator.File {
 		//this will return FileRequest
+		return data, nil
+	}
+
+	if validator.RegexString != "" {
+		if dataType != reflect.String {
+			if validator.CustomMsg.OnRegexString != nil {
+				return nil, buildMessage(*validator.CustomMsg.OnRegexString, MessageMeta{Field: field})
+			}
+			return nil, errors.New("the field '" + field + "' should be string")
+		}
+		regex := regexp.MustCompile(validator.RegexString)
+		if !regex.MatchString(data.(string)) {
+			if validator.CustomMsg.OnRegexString != nil {
+				return nil, buildMessage(*validator.CustomMsg.OnRegexString, MessageMeta{Field: field})
+			}
+			return nil, errors.New("the field '" + field + "' is not valid regex")
+		}
 		return data, nil
 	}
 
@@ -285,6 +319,8 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 func SetTotal(total int) *int {
 	return &total
 }
+
+func SetMessage(msg string) *string { return &msg }
 
 func ToInterfaceSlice(slice interface{}) []interface{} {
 	s := reflect.ValueOf(slice)

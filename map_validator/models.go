@@ -5,17 +5,22 @@ import (
 	"reflect"
 )
 
+type MessageMeta struct {
+	Field string
+}
+
 type EnumField[T any] struct {
 	Items               T
 	StringCaseSensitive bool // will support soon
 }
 
 type CustomMsg struct {
-	OnTypeNotMatch      *string
-	OnEnumValueNotMatch *string
-	OnNull              *string
-	OnMax               *string
-	OnMin               *string
+	//OnTypeNotMatch      *string
+	//OnEnumValueNotMatch *string
+	//OnNull              *string
+	//OnMax               *string
+	//OnMin               *string
+	OnRegexString *string
 }
 
 type Rules struct {
@@ -34,6 +39,7 @@ type Rules struct {
 	IPV4Network        bool
 	IPv4OptionalPrefix bool
 	File               bool
+	RegexString        string
 
 	CustomMsg CustomMsg // will support soon
 }
