@@ -1,11 +1,4 @@
 mode: set
-github.com/Rhyanz46/go-map-validator/test/functions.go:3.70,4.27 1 1
-github.com/Rhyanz46/go-map-validator/test/functions.go:4.27,6.3 1 1
-github.com/Rhyanz46/go-map-validator/test/functions.go:7.2,7.8 1 1
-github.com/Rhyanz46/go-map-validator/test/functions.go:10.64,11.27 1 1
-github.com/Rhyanz46/go-map-validator/test/functions.go:11.27,12.17 1 1
-github.com/Rhyanz46/go-map-validator/test/functions.go:12.17,14.4 1 1
-github.com/Rhyanz46/go-map-validator/test/functions.go:16.2,16.8 1 0
 github.com/Rhyanz46/go-map-validator/map_validator/extra_operations.go:8.56,10.39 2 0
 github.com/Rhyanz46/go-map-validator/map_validator/extra_operations.go:10.39,12.3 1 0
 github.com/Rhyanz46/go-map-validator/map_validator/extra_operations.go:13.2,56.16 3 0

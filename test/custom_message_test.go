@@ -43,3 +43,20 @@ func TestInvalidRegexMessage(t *testing.T) {
 		t.Errorf("Expected '%s', but we got '%s' :", expected, err.Error())
 	}
 }
+
+func TestValidRegexMessage(t *testing.T) {
+	payload := map[string]interface{}{"hp": "+62567888", "email": "dev@ariansaputra.com"}
+	validRole := map[string]map_validator.Rules{
+		"hp": {RegexString: `^\+(?:\d{2}[- ]?\d{6}|\d{11})$`, CustomMsg: map_validator.CustomMsg{
+			OnRegexString: map_validator.SetMessage("Your ${field} is not valid phone number"),
+		}},
+	}
+	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+	}
+	_, err = check.RunValidate()
+	if err != nil {
+		t.Errorf("Expected no error, but we got error : %s ", err.Error())
+	}
+}
