@@ -9,6 +9,33 @@ examples : https://github.com/Rhyanz46/go-map-validator-examples
 go get github.com/Rhyanz46/go-map-validator/map_validator
 ```
 
+## Features
+- validate value in `map[string]interface{}` by keys
+- validate data from `http.Request` json/multipart
+  - support file upload
+- enum value check
+- min/max length data check
+- email field check
+- uuid field check
+- IPv4 field check
+- IPv4 Network check
+-
+
+## On Progress
+- validation for one data value only
+
+## Road Map
+- avoiding same value in some field
+  - ex case : `old_password` and `new_password`
+- get from urls params http
+- validation for `base64`
+- handle file size on multipart
+- other package for generate OpenAPI Spec that support with this package
+- regex on string validation
+- image resolution validation
+- nested data
+
+
 ## example :
 
 ### Example 1
@@ -90,30 +117,3 @@ if testBind.JK != payload["jenis_kelamin"] {
 }
 
 ```
-
-## Features
-- validate value in `map[string]interface{}` by keys
-- validate data from `http.Request` json/multipart
-  - support file upload
-- enum value check
-- min/max length data check
-- email field check
-- uuid field check
-- IPv4 field check
-- IPv4 Network check
-- 
-
-## On Progress
-- validation for one data value only
-
-## Road Map
-- avoiding same value in some field
-  - ex case : `old_password` and `new_password`
-- get from urls params http
-- validation for `base64`
-- handle file size on multipart
-- other package for generate OpenAPI Spec that support with this package
-- regex on string validation
-- image resolution validation
-- nested data
-
