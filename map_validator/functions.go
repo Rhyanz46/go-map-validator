@@ -64,9 +64,26 @@ func isIPv4NetworkValid(ip string) bool {
 }
 
 func buildMessage(msg string, meta MessageMeta) error {
-	field := "${field}"
-	if strings.Contains(msg, field) {
-		msg = strings.ReplaceAll(msg, field, meta.Field)
+	fieldVar := "${field}"
+	expectedTypeVar := "${expected_type}"
+	actualTypeVar := "${actual_type}"
+	if strings.Contains(msg, fieldVar) {
+		if meta.Field != nil {
+			v := *meta.Field
+			msg = strings.ReplaceAll(msg, fieldVar, v)
+		}
+	}
+	if strings.Contains(msg, expectedTypeVar) {
+		v := *meta.ExpectedType
+		if meta.ExpectedType != nil {
+			msg = strings.ReplaceAll(msg, expectedTypeVar, v.String())
+		}
+	}
+	if strings.Contains(msg, actualTypeVar) {
+		v := *meta.ActualType
+		if meta.ActualType != nil {
+			msg = strings.ReplaceAll(msg, actualTypeVar, v.String())
+		}
 	}
 	return errors.New(msg)
 }
@@ -123,6 +140,13 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 		if dataFrom == fromHttpJson && isIntegerFamily(validator.Type) {
 			validator.Type = reflect.Int
 		}
+		if validator.CustomMsg.OnTypeNotMatch != nil {
+			return nil, buildMessage(*validator.CustomMsg.OnTypeNotMatch, MessageMeta{
+				Field:        &field,
+				ExpectedType: &validator.Type,
+				ActualType:   &dataType,
+			})
+		}
 		return nil, errors.New("the field '" + field + "' should be '" + validator.Type.String() + "'")
 	}
 
@@ -134,14 +158,14 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	if validator.RegexString != "" {
 		if dataType != reflect.String {
 			if validator.CustomMsg.OnRegexString != nil {
-				return nil, buildMessage(*validator.CustomMsg.OnRegexString, MessageMeta{Field: field})
+				return nil, buildMessage(*validator.CustomMsg.OnRegexString, MessageMeta{Field: &field})
 			}
 			return nil, errors.New("the field '" + field + "' should be string")
 		}
 		regex := regexp.MustCompile(validator.RegexString)
 		if !regex.MatchString(data.(string)) {
 			if validator.CustomMsg.OnRegexString != nil {
-				return nil, buildMessage(*validator.CustomMsg.OnRegexString, MessageMeta{Field: field})
+				return nil, buildMessage(*validator.CustomMsg.OnRegexString, MessageMeta{Field: &field})
 			}
 			return nil, errors.New("the field '" + field + "' is not valid regex")
 		}
