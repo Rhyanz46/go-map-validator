@@ -9,6 +9,7 @@ type validatorType interface {
 type setRoleOperationType interface {
 	SetRules(validations map[string]Rules) *dataState
 	StrictKeys() *ruleState
+	AddExtension(extension ExtensionType) *ruleState
 }
 
 type loadOperationType interface {
@@ -18,12 +19,21 @@ type loadOperationType interface {
 }
 
 type finalOperationType interface {
-	RunValidate() (*extraOperation, error)
+	RunValidate() (*ExtraOperationData, error)
 }
 
-type extraOperationType interface {
+type ExtraOperationType interface {
 	Bind(i interface{}) error
 	GetFilledField() []string
 	GetNullField() []string
 	GetData() map[string]interface{}
+}
+
+type ExtensionType interface {
+	SetRoles(rules *map[string]Rules)
+	BeforeLoad(data interface{}) error
+	AfterLoad(data *map[string]interface{}) error
+	BeforeValidation(data *map[string]interface{}) error
+	AfterValidation(data *map[string]interface{}) error
+	SetExtraData(data *ExtraOperationData) ExtensionType
 }

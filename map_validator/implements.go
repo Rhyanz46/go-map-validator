@@ -16,15 +16,31 @@ func (state *ruleState) SetRules(validations map[string]Rules) *dataState {
 	if len(validations) == 0 {
 		panic("you need to set roles")
 	}
+
+	var tempExt []ExtensionType
 	state.rules = validations
+
+	for _, ex := range state.extension {
+		ex.SetRoles(&state.rules)
+		tempExt = append(tempExt, ex)
+	}
+	if len(tempExt) > 0 {
+		state.extension = tempExt
+	}
 	return &dataState{
 		rules:              &state.rules,
+		extension:          state.extension,
 		strictAllowedValue: state.strictAllowedValue,
 	}
 }
 
 func (state *ruleState) StrictKeys() *ruleState {
 	state.strictAllowedValue = true
+	return state
+}
+
+func (state *ruleState) AddExtension(extension ExtensionType) *ruleState {
+	state.extension = append(state.extension, extension)
 	return state
 }
 
@@ -47,9 +63,22 @@ func (state *dataState) Load(data map[string]interface{}) (*finalOperation, erro
 			return nil, err
 		}
 	}
+	for _, ex := range state.extension {
+		err := ex.BeforeLoad(&data)
+		if err != nil {
+			return nil, err
+		}
+	}
+	for _, ex := range state.extension {
+		err := ex.AfterLoad(&data)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return &finalOperation{
 		rules:      state.rules,
 		loadedFrom: fromMapString,
+		extension:  state.extension,
 		data:       data,
 	}, nil
 }
@@ -60,6 +89,12 @@ func (state *dataState) LoadJsonHttp(r *http.Request) (*finalOperation, error) {
 	}
 	if r == nil {
 		return nil, errors.New("no data to Load")
+	}
+	for _, ex := range state.extension {
+		err := ex.BeforeLoad(r)
+		if err != nil {
+			return nil, err
+		}
 	}
 	var mapData map[string]interface{}
 	err := json.NewDecoder(r.Body).Decode(&mapData)
@@ -74,9 +109,16 @@ func (state *dataState) LoadJsonHttp(r *http.Request) (*finalOperation, error) {
 			return nil, err
 		}
 	}
+	for _, ex := range state.extension {
+		err := ex.AfterLoad(&mapData)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return &finalOperation{
 		rules:      state.rules,
 		loadedFrom: fromHttpJson,
+		extension:  state.extension,
 		data:       mapData,
 	}, nil
 }
@@ -87,6 +129,12 @@ func (state *dataState) LoadFormHttp(r *http.Request) (*finalOperation, error) {
 	}
 	if r == nil {
 		return nil, errors.New("no data to Load")
+	}
+	for _, ex := range state.extension {
+		err := ex.BeforeLoad(r)
+		if err != nil {
+			return nil, err
+		}
 	}
 	mapData := map[string]interface{}{}
 	allowType := []reflect.Kind{reflect.String, reflect.Int, reflect.Bool}
@@ -125,19 +173,32 @@ func (state *dataState) LoadFormHttp(r *http.Request) (*finalOperation, error) {
 			return nil, err
 		}
 	}
+	for _, ex := range state.extension {
+		err := ex.AfterLoad(&mapData)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return &finalOperation{
 		rules:      state.rules,
 		loadedFrom: fromHttpMultipartForm,
+		extension:  state.extension,
 		data:       mapData,
 	}, nil
 }
 
-func (state *finalOperation) RunValidate() (*extraOperation, error) {
+func (state *finalOperation) RunValidate() (*ExtraOperationData, error) {
 	if state == nil || state.data == nil {
 		return nil, errors.New("no data to Validate because last progress is error")
 	}
 	var filledFields []string
 	var nullFields []string
+	for _, ex := range state.extension {
+		err := ex.BeforeValidation(&state.data)
+		if err != nil {
+			return nil, err
+		}
+	}
 	for key, validationData := range *state.rules {
 		data, err := validate(key, state.data, validationData, state.loadedFrom)
 		if err != nil {
@@ -149,11 +210,18 @@ func (state *finalOperation) RunValidate() (*extraOperation, error) {
 			nullFields = append(nullFields, key)
 		}
 	}
-	return &extraOperation{
+	extraData := &ExtraOperationData{
 		rules:        state.rules,
 		loadedFrom:   &state.loadedFrom,
 		data:         &state.data,
 		filledFields: filledFields,
 		nullFields:   nullFields,
-	}, nil
+	}
+	for _, ex := range state.extension {
+		err := ex.SetExtraData(extraData).AfterValidation(&state.data)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return extraData, nil
 }

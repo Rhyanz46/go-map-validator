@@ -53,21 +53,24 @@ type FileRequest struct {
 
 type ruleState struct {
 	rules              map[string]Rules
+	extension          []ExtensionType
 	strictAllowedValue bool
 }
 
 type dataState struct {
 	rules              *map[string]Rules
+	extension          []ExtensionType
 	strictAllowedValue bool
 }
 
 type finalOperation struct {
 	rules      *map[string]Rules
 	loadedFrom loadFromType
+	extension  []ExtensionType
 	data       map[string]interface{}
 }
 
-type extraOperation struct {
+type ExtraOperationData struct {
 	rules        *map[string]Rules
 	loadedFrom   *loadFromType
 	data         *map[string]interface{}

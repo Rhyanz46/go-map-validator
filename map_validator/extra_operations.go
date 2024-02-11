@@ -5,7 +5,7 @@ import (
 	"errors"
 )
 
-func (state *extraOperation) Bind(i interface{}) error {
+func (state *ExtraOperationData) Bind(i interface{}) error {
 	var data map[string]interface{}
 	if state == nil || state.data == nil {
 		return errors.New("no data to Bind because last progress is error")
@@ -64,20 +64,20 @@ func (state *extraOperation) Bind(i interface{}) error {
 	return nil
 }
 
-func (state *extraOperation) GetFilledField() []string {
+func (state *ExtraOperationData) GetFilledField() []string {
 	if len(state.filledFields) > 0 {
 		return state.filledFields
 	}
 	return []string{}
 }
 
-func (state *extraOperation) GetNullField() []string {
+func (state *ExtraOperationData) GetNullField() []string {
 	if len(state.nullFields) > 0 {
 		return state.nullFields
 	}
 	return []string{}
 }
 
-func (state *extraOperation) GetData() map[string]interface{} {
+func (state *ExtraOperationData) GetData() map[string]interface{} {
 	return *state.data
 }
