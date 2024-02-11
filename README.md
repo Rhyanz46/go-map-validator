@@ -25,7 +25,7 @@ go get github.com/Rhyanz46/go-map-validator/map_validator
 - IPv4 field check
 - IPv4 Network check
 - regex on string validation
-- you can create your own extension 🔥🔥🔥🔥 (example : https://github.com/Rhyanz46/go-map-validator/example_extensions/)
+- you can create your own extension 🔥🔥🔥🔥 (example : [https://github.com/Rhyanz46/go-map-validator/example_extensions/](https://github.com/Rhyanz46/go-map-validator/tree/main/example_extensions))
 - custom message :
     - on invalid regex message : ✅
     - on type not match message : ✅
