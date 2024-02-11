@@ -31,6 +31,7 @@ go get github.com/Rhyanz46/go-map-validator/map_validator
 
 ## On Progress
 
+- extension code
 - validation for one data value only
 
 ## Road Map
