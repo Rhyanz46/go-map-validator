@@ -10,6 +10,9 @@ examples : https://github.com/Rhyanz46/go-map-validator-examples
 go get github.com/Rhyanz46/go-map-validator/map_validator
 ```
 
+### discussion or updates
+- [On Telegram](https://t.me/addlist/Wi84VFNkvz85MWFl)
+
 ## Features
 
 - validate value in `map[string]interface{}` by keys
