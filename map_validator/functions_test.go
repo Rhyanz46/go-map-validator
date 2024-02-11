@@ -10,7 +10,7 @@ func TestValidateUUID(t *testing.T) {
 		"field1": "123e4567-e89b-12d3-a456-426614174001",
 	}
 
-	validator := Rules{
+	validator := Rule{
 		UUID: true,
 		Null: false,
 	}
@@ -27,7 +27,7 @@ func TestValidateInvalidUUID(t *testing.T) {
 		"field1": "invalid-uuid",
 	}
 
-	validator := Rules{
+	validator := Rule{
 		UUID: true,
 		Null: false,
 	}
@@ -49,7 +49,7 @@ func TestValidateNotNull(t *testing.T) {
 		"field1": "value",
 	}
 
-	validator := Rules{
+	validator := Rule{
 		Type: reflect.String,
 		Null: false,
 	}
@@ -66,7 +66,7 @@ func TestValidateNullNotAllowed(t *testing.T) {
 		"field1": nil,
 	}
 
-	validator := Rules{
+	validator := Rule{
 		Type: reflect.String,
 		Null: false,
 	}
@@ -88,7 +88,7 @@ func TestValidateStringMaxLength(t *testing.T) {
 		"field1": "1234567890",
 	}
 
-	validator := Rules{
+	validator := Rule{
 		Type: reflect.String,
 		Max:  SetTotal(5),
 	}
@@ -110,7 +110,7 @@ func TestValidateStringMinLength(t *testing.T) {
 		"field1": "123",
 	}
 
-	validator := Rules{
+	validator := Rule{
 		Type: reflect.String,
 		Min:  SetTotal(5),
 	}
@@ -132,7 +132,7 @@ func TestValidateEmail(t *testing.T) {
 		"email": "test@example.com",
 	}
 
-	validator := Rules{
+	validator := Rule{
 		Email: true,
 	}
 
@@ -148,7 +148,7 @@ func TestValidateInvalidEmail(t *testing.T) {
 		"email": "invalid-email",
 	}
 
-	validator := Rules{
+	validator := Rule{
 		Email: true,
 	}
 
@@ -169,7 +169,7 @@ func TestValidateIPV4(t *testing.T) {
 		"ip_address": "192.168.1.1",
 	}
 
-	validator := Rules{
+	validator := Rule{
 		IPV4: true,
 	}
 
@@ -185,7 +185,7 @@ func TestValidateInvalidIPV4(t *testing.T) {
 		"ip_address": "invalid-ip",
 	}
 
-	validator := Rules{
+	validator := Rule{
 		IPV4: true,
 	}
 
@@ -204,7 +204,7 @@ func TestValidateInvalidIPV4(t *testing.T) {
 func TestEnumFieldCheck(t *testing.T) {
 	payload := map[string]interface{}{"validatorType": "arian", "jenis_kelamin": "laki-laki", "hoby": "Main PS"}
 	_, err := validate(
-		"validatorType", payload, Rules{
+		"validatorType", payload, Rule{
 			Null: false,
 			Enum: &EnumField[any]{Items: []string{"arian", "aaa"}},
 		}, fromHttpJson,
@@ -214,7 +214,7 @@ func TestEnumFieldCheck(t *testing.T) {
 	}
 
 	_, err = validate(
-		"jenis_kelamin", payload, Rules{
+		"jenis_kelamin", payload, Rule{
 			Null: false,
 			Enum: &EnumField[any]{Items: []string{"perempuan", "laki-laki"}},
 		}, fromHttpJson,
@@ -224,7 +224,7 @@ func TestEnumFieldCheck(t *testing.T) {
 	}
 
 	_, err = validate(
-		"jenis_kelamin", payload, Rules{
+		"jenis_kelamin", payload, Rule{
 			Null: false,
 			Enum: &EnumField[any]{Items: []string{"bola", "badminton", "renang"}},
 		}, fromHttpJson,
@@ -238,7 +238,7 @@ func TestEnumFieldCheck(t *testing.T) {
 func TestIntFamily(t *testing.T) {
 	payload := map[string]interface{}{"umur": 1, "harga": 1.3}
 	_, err := validate(
-		"umur", payload, Rules{
+		"umur", payload, Rule{
 			Type: reflect.Int,
 		}, fromMapString,
 	)
@@ -248,7 +248,7 @@ func TestIntFamily(t *testing.T) {
 
 	payload = map[string]interface{}{"umur": 1, "harga": 1.3}
 	_, err = validate(
-		"umur", payload, Rules{
+		"umur", payload, Rule{
 			Type: reflect.Int,
 		}, fromHttpJson,
 	)
@@ -257,7 +257,7 @@ func TestIntFamily(t *testing.T) {
 	}
 
 	_, err = validate(
-		"harga", payload, Rules{
+		"harga", payload, Rule{
 			Type: reflect.Float64,
 		}, fromHttpJson,
 	)
@@ -267,7 +267,7 @@ func TestIntFamily(t *testing.T) {
 
 	payload = map[string]interface{}{"power": 133.3, "harga": 1.3}
 	_, err = validate(
-		"power", payload, Rules{
+		"power", payload, Rule{
 			Type: reflect.Int,
 		}, fromHttpJson,
 	)
@@ -277,7 +277,7 @@ func TestIntFamily(t *testing.T) {
 
 	payload = map[string]interface{}{"power": 133.3, "harga": 1.3}
 	_, err = validate(
-		"power", payload, Rules{
+		"power", payload, Rule{
 			Type: reflect.Int16,
 		}, fromHttpJson,
 	)
@@ -287,7 +287,7 @@ func TestIntFamily(t *testing.T) {
 
 	payload = map[string]interface{}{"power": "133.3", "harga": 1.3}
 	_, err = validate(
-		"power", payload, Rules{
+		"power", payload, Rule{
 			Type: reflect.Int16,
 		}, fromHttpJson,
 	)
@@ -297,7 +297,7 @@ func TestIntFamily(t *testing.T) {
 	}
 
 	_, err = validate(
-		"harga", payload, Rules{
+		"harga", payload, Rule{
 			Type: reflect.Float64,
 		}, fromHttpJson,
 	)

@@ -25,7 +25,7 @@ type CustomMsg struct {
 	OnRegexString *string
 }
 
-type Rules struct {
+type Rule struct {
 	Null               bool
 	NilIfNull          bool
 	IsMapInterface     bool
@@ -52,23 +52,23 @@ type FileRequest struct {
 }
 
 type ruleState struct {
-	rules              map[string]Rules
+	rules              map[string]Rule
 	strictAllowedValue bool
 }
 
 type dataState struct {
-	rules              *map[string]Rules
+	rules              *map[string]Rule
 	strictAllowedValue bool
 }
 
 type finalOperation struct {
-	rules      *map[string]Rules
+	rules      *map[string]Rule
 	loadedFrom loadFromType
 	data       map[string]interface{}
 }
 
 type extraOperation struct {
-	rules        *map[string]Rules
+	rules        *map[string]Rule
 	loadedFrom   *loadFromType
 	data         *map[string]interface{}
 	filledFields []string

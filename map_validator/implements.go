@@ -12,7 +12,7 @@ func NewValidateBuilder() *ruleState {
 	return &ruleState{}
 }
 
-func (state *ruleState) SetRules(validations map[string]Rules) *dataState {
+func (state *ruleState) SetRules(validations map[string]Rule) *dataState {
 	if len(validations) == 0 {
 		panic("you need to set roles")
 	}

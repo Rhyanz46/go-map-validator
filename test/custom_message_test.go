@@ -8,7 +8,7 @@ import (
 
 func TestInvalidRegexMessage(t *testing.T) {
 	payload := map[string]interface{}{"hp": "62567888", "email": "devariansaputra.com"}
-	validRole := map[string]map_validator.Rules{
+	validRole := map[string]map_validator.Rule{
 		"hp": {RegexString: `^\+(?:\d{2}[- ]?\d{6}|\d{11})$`, CustomMsg: map_validator.CustomMsg{
 			OnRegexString: map_validator.SetMessage("Your ${field} is not valid phone number"),
 		}},
@@ -25,7 +25,7 @@ func TestInvalidRegexMessage(t *testing.T) {
 	if err.Error() != expected {
 		t.Errorf("Expected '%s', but we got '%s' :", expected, err.Error())
 	}
-	validRole = map[string]map_validator.Rules{
+	validRole = map[string]map_validator.Rule{
 		"email": {
 			RegexString: `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`,
 			CustomMsg:   map_validator.CustomMsg{OnRegexString: map_validator.SetMessage("Your email is not valid email format")},
@@ -47,7 +47,7 @@ func TestInvalidRegexMessage(t *testing.T) {
 
 func TestValidRegexMessage(t *testing.T) {
 	payload := map[string]interface{}{"hp": "+62567888", "email": "dev@ariansaputra.com"}
-	validRole := map[string]map_validator.Rules{
+	validRole := map[string]map_validator.Rule{
 		"hp": {RegexString: `^\+(?:\d{2}[- ]?\d{6}|\d{11})$`, CustomMsg: map_validator.CustomMsg{
 			OnRegexString: map_validator.SetMessage("Your ${field} is not valid phone number"),
 		}},
@@ -64,7 +64,7 @@ func TestValidRegexMessage(t *testing.T) {
 
 func TestInvalidTypeNotMatchMessage(t *testing.T) {
 	payload := map[string]interface{}{"total": "2", "unit": "KG"}
-	validRole := map[string]map_validator.Rules{
+	validRole := map[string]map_validator.Rule{
 		"total": {
 			Type: reflect.Int64,
 			CustomMsg: map_validator.CustomMsg{
@@ -88,7 +88,7 @@ func TestInvalidTypeNotMatchMessage(t *testing.T) {
 
 func TestValidTypeNotMatchMessage(t *testing.T) {
 	payload := map[string]interface{}{"total": 12, "unit": "KG"}
-	validRole := map[string]map_validator.Rules{
+	validRole := map[string]map_validator.Rule{
 		"total": {
 			Type: reflect.Int,
 			CustomMsg: map_validator.CustomMsg{

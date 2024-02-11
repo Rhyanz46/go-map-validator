@@ -88,7 +88,7 @@ func buildMessage(msg string, meta MessageMeta) error {
 	return errors.New(msg)
 }
 
-func validate(field string, dataTemp map[string]interface{}, validator Rules, dataFrom loadFromType) (interface{}, error) {
+func validate(field string, dataTemp map[string]interface{}, validator Rule, dataFrom loadFromType) (interface{}, error) {
 	//var oldIntType reflect.Kind
 	data := dataTemp[field]
 

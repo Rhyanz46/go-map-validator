@@ -7,7 +7,7 @@ type validatorType interface {
 }
 
 type setRoleOperationType interface {
-	SetRules(validations map[string]Rules) *dataState
+	SetRules(validations map[string]Rule) *dataState
 	StrictKeys() *ruleState
 }
 

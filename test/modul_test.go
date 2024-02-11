@@ -12,12 +12,12 @@ func TestMultipleValidation(t *testing.T) {
 		Hoby    string `map_validator:"hoby" json:"hoby"`
 		Menikah bool   `map_validator:"menikah" json:"menikah"`
 	}
-	validRole := map[string]map_validator.Rules{
+	validRole := map[string]map_validator.Rule{
 		"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
 		"hoby":          {Type: reflect.String, Null: false},
 		"menikah":       {Type: reflect.Bool, Null: false},
 	}
-	validRoleOptionalMenikah := map[string]map_validator.Rules{
+	validRoleOptionalMenikah := map[string]map_validator.Rule{
 		"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
 		"hoby":          {Type: reflect.String, Null: false},
 		"menikah":       {Type: reflect.Bool, Null: true},
@@ -46,7 +46,7 @@ func TestMultipleValidation(t *testing.T) {
 		t.Errorf("Expected : %s But you got : %s", payload["jenis_kelamin"], testBind.JK)
 	}
 
-	check, err = map_validator.NewValidateBuilder().SetRules(map[string]map_validator.Rules{
+	check, err = map_validator.NewValidateBuilder().SetRules(map[string]map_validator.Rule{
 		"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
 		"hoby":          {Type: reflect.Int, Null: false},
 		"menikah":       {Type: reflect.Bool, Null: false},
@@ -123,7 +123,7 @@ func TestPointerFieldBinding(t *testing.T) {
 		Hoby    *string `map_validator:"hoby" json:"hoby"`
 		Menikah bool    `map_validator:"menikah" json:"menikah"`
 	}
-	validRole := map[string]map_validator.Rules{
+	validRole := map[string]map_validator.Rule{
 		"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
 		"hoby":          {Type: reflect.String, Null: true},
 		"menikah":       {Type: reflect.Bool, Null: false},
@@ -166,7 +166,7 @@ func TestInterfaceFieldBinding(t *testing.T) {
 		Menikah  bool        `map_validator:"menikah" json:"menikah"`
 		ListData interface{} `map_validator:"list_data" json:"list_data"`
 	}
-	validRole := map[string]map_validator.Rules{
+	validRole := map[string]map_validator.Rule{
 		"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
 		"hoby":          {Type: reflect.String, Null: true},
 		"menikah":       {Type: reflect.Bool, Null: false},
@@ -207,7 +207,7 @@ func TestInterfaceFieldBinding(t *testing.T) {
 
 func TestFilledAndNullField(t *testing.T) {
 	payload := map[string]interface{}{"nama": "arian", "umur": 1}
-	validRole := map[string]map_validator.Rules{
+	validRole := map[string]map_validator.Rule{
 		"nama": {Type: reflect.String},
 		"hoby": {Type: reflect.String, Null: true},
 		"umur": {Type: reflect.Int, Null: false},
@@ -232,7 +232,7 @@ func TestFilledAndNullField(t *testing.T) {
 
 func TestGetMapData(t *testing.T) {
 	payload := map[string]interface{}{"nama": "arian", "umur": 1}
-	validRole := map[string]map_validator.Rules{
+	validRole := map[string]map_validator.Rule{
 		"nama": {Type: reflect.String},
 		"hoby": {Type: reflect.String, Null: true},
 		"umur": {Type: reflect.Int, Null: false},
@@ -255,7 +255,7 @@ func TestGetMapData(t *testing.T) {
 
 func TestStrict(t *testing.T) {
 	payload := map[string]interface{}{"nama": "arian", "umur": 1, "favorite": "coklat"}
-	validRole := map[string]map_validator.Rules{
+	validRole := map[string]map_validator.Rule{
 		"nama": {Type: reflect.String},
 		"hoby": {Type: reflect.String, Null: true},
 		"umur": {Type: reflect.Int, Null: false},
@@ -274,7 +274,7 @@ func TestStrict(t *testing.T) {
 
 func TestValidRegex(t *testing.T) {
 	payload := map[string]interface{}{"hp": "+62567888", "email": "dev@ariansaputra.com"}
-	validRole := map[string]map_validator.Rules{
+	validRole := map[string]map_validator.Rule{
 		"hp":    {RegexString: `^\+(?:\d{2}[- ]?\d{6}|\d{11})$`},
 		"email": {RegexString: `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`},
 	}
@@ -290,7 +290,7 @@ func TestValidRegex(t *testing.T) {
 
 func TestInvalidRegex(t *testing.T) {
 	payload := map[string]interface{}{"hp": "62567888", "email": "devariansaputra.com"}
-	validRole := map[string]map_validator.Rules{
+	validRole := map[string]map_validator.Rule{
 		"hp": {RegexString: `^\+(?:\d{2}[- ]?\d{6}|\d{11})$`},
 	}
 	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
@@ -301,7 +301,7 @@ func TestInvalidRegex(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error, but got no error :")
 	}
-	validRole = map[string]map_validator.Rules{
+	validRole = map[string]map_validator.Rule{
 		"email": {RegexString: `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`},
 	}
 	check, err = map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
