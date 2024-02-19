@@ -49,12 +49,14 @@ go get github.com/Rhyanz46/go-map-validator/map_validator
 
 - avoiding same value in some field
     - ex case : `old_password` and `new_password`
+- nested validation
 - get from urls params http
 - validation for `base64`
 - handle file size on multipart
 - extension for generate OpenAPI Spec that support with this package
 - image resolution validation
-- nested data
+- OR validation (ex : IPv4: true, UUID: true, MultipleCondition: true)
+- Custom Validation
 
 
 ## example :
