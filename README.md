@@ -2,7 +2,7 @@
 
 You can integrate with all golang framework using `http.Request` interface
 
-examples : https://github.com/Rhyanz46/go-map-validator-examples
+examples : https://github.com/Rhyanz46/go-map-validator/tree/main/test
 
 ### Install
 
