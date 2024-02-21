@@ -102,6 +102,8 @@ jsonDataRoles := map_validator.NewValidateBuilder().StrictKeys().SetRules(map[st
     },
 })
 ```
+![image](https://github.com/Rhyanz46/go-map-validator/assets/24217568/9f58dde4-b175-4a4f-9369-fa0974c25942)
+
 
 ### Example 3 ( Echo Framework )
 ```go
