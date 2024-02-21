@@ -96,7 +96,7 @@ func validateRecursive(key string, data map[string]interface{}, rule Rules, load
 
 	if rule.Object != nil && res != nil {
 		for keyX, ruleX := range *rule.Object {
-			_, err := validateRecursive(keyX, res.(map[string]interface{}), ruleX, fromJSONEncoder)
+			_, err = validateRecursive(keyX, res.(map[string]interface{}), ruleX, fromJSONEncoder)
 			if err != nil {
 				//if rule.CustomMsg != nil #TODO: custom message for nested object
 				return nil, err
@@ -106,12 +106,25 @@ func validateRecursive(key string, data map[string]interface{}, rule Rules, load
 		}
 	}
 
+	if rule.ListObject != nil && res != nil {
+		listRes := res.([]interface{})
+		for _, xRes := range listRes {
+			for keyX, ruleX := range *rule.ListObject {
+				_, err = validateRecursive(keyX, xRes.(map[string]interface{}), ruleX, fromJSONEncoder)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+
 	return res, nil
 }
 
 func validate(field string, dataTemp map[string]interface{}, validator Rules, dataFrom loadFromType) (interface{}, error) {
 	//var oldIntType reflect.Kind
 	data := dataTemp[field]
+	var sliceData []interface{}
 	//var isListObject bool
 
 	// null validation
@@ -127,13 +140,13 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 		return nil, nil
 	}
 
-	if validator.IsMapInterface || validator.Object != nil {
-		res, err := toMapStringInterface(data)
-		if err != nil {
-			return nil, errors.New("field '" + field + "' is not valid object")
-		}
-		return res, nil
-	}
+	//if validator.ListObject != nil {
+	//	res, err := toInterfaceSlice(data)
+	//	if err != nil {
+	//		return nil, errors.New("field '" + field + "' is not valid object")
+	//	}
+	//	return res, nil
+	//}
 
 	// validatorType type validation
 	dataType := reflect.TypeOf(data).Kind()
@@ -144,13 +157,17 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 		!validator.IPv4OptionalPrefix &&
 		!validator.Email &&
 		validator.Enum == nil &&
+		validator.Object == nil &&
+		validator.ListObject == nil &&
+		!validator.IsMapInterface &&
 		!validator.File &&
 		!validator.IPV4Network &&
 		validator.RegexString == "")
 
-	if dataType == reflect.Slice && !validator.Null && len(toInterfaceSlice(data)) == 0 {
-		return nil, errors.New("you need to input validatorType in '" + field + "' field")
-	}
+	//if dataType == reflect.Slice && !validator.Null && len(toInterfaceSlice(data)) == 0 {
+	//	//if dataType == reflect.Slice && !validator.Null {
+	//	return nil, errors.New("you need to input validatorType in '" + field + "' field")
+	//}
 
 	if dataType != validator.Type && !customData && !handleIntOnHttpJson {
 		if (dataFrom == fromHttpJson || dataFrom == fromJSONEncoder) && isIntegerFamily(validator.Type) {
@@ -321,6 +338,32 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 		return false, nil
 	}
 
+	if validator.ListObject != nil {
+		validator.Type = reflect.Slice
+	}
+
+	if validator.Type == reflect.Slice {
+		sliceDataX, ok := toInterfaceSlice(data)
+		if validator.ListObject != nil {
+			if !ok {
+				return nil, errors.New("field '" + field + "' is not valid list object")
+			}
+		}
+		if !ok {
+			return nil, errors.New("field '" + field + "' is not valid list")
+		}
+		sliceData = sliceDataX
+		data = sliceDataX
+	}
+
+	if validator.IsMapInterface || validator.Object != nil {
+		res, err := toMapStringInterface(data)
+		if err != nil {
+			return nil, errors.New("field '" + field + "' is not valid object")
+		}
+		return res, nil
+	}
+
 	if validator.Min != nil && data != nil {
 		if reflect.String == dataType {
 			if total := utf8.RuneCountInString(data.(string)); total < *validator.Min {
@@ -330,6 +373,12 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 			}
 		} else if reflect.Float64 == dataType {
 			if int(data.(float64)) < *validator.Min {
+				return nil, errors.New(
+					fmt.Sprintf("the field '%s' should be or greater than %v", field, *validator.Min),
+				)
+			}
+		} else if reflect.Slice == dataType {
+			if len(sliceData) < *validator.Min {
 				return nil, errors.New(
 					fmt.Sprintf("the field '%s' should be or greater than %v", field, *validator.Min),
 				)
@@ -350,6 +399,12 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 					fmt.Sprintf("the field '%s' should be or lower than %v", field, *validator.Max),
 				)
 			}
+		} else if reflect.Slice == dataType {
+			if len(sliceData) > *validator.Max {
+				return nil, errors.New(
+					fmt.Sprintf("the field '%s' should be or lower than %v", field, *validator.Max),
+				)
+			}
 		}
 	}
 
@@ -362,14 +417,15 @@ func SetTotal(total int) *int {
 
 func SetMessage(msg string) *string { return &msg }
 
-func toInterfaceSlice(slice interface{}) []interface{} {
+func toInterfaceSlice(slice interface{}) ([]interface{}, bool) {
+
 	s := reflect.ValueOf(slice)
 	if s.Kind() != reflect.Slice {
-		panic("InterfaceSlice() given a non-slice type")
+		return nil, false
 	}
 
 	if s.IsNil() {
-		return nil
+		return nil, true
 	}
 
 	ret := make([]interface{}, s.Len())
@@ -378,7 +434,7 @@ func toInterfaceSlice(slice interface{}) []interface{} {
 		ret[i] = s.Index(i).Interface()
 	}
 
-	return ret
+	return ret, true
 }
 
 func toMapStringInterface(data interface{}) (map[string]interface{}, error) {

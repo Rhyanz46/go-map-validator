@@ -43,7 +43,7 @@ type Rules struct {
 	File               bool
 	RegexString        string
 	Object             *map[string]Rules
-	ListChild          *[]map[string]Rules
+	ListObject         *map[string]Rules
 
 	CustomMsg CustomMsg // will support soon
 }

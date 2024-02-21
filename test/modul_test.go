@@ -1,7 +1,6 @@
 package test
 
 import (
-	"fmt"
 	"github.com/Rhyanz46/go-map-validator/map_validator"
 	"reflect"
 	"testing"
@@ -223,7 +222,6 @@ func TestFilledAndNullField(t *testing.T) {
 	}
 	totalFilled := extraCheck.GetFilledField()
 	totalNull := extraCheck.GetNullField()
-	fmt.Println(extraCheck.GetData())
 	if len(totalFilled) != 2 {
 		t.Errorf("Expected total data is 2, but we got %v data = (%v)", len(totalFilled), totalFilled)
 	}
@@ -313,5 +311,60 @@ func TestInvalidRegex(t *testing.T) {
 	_, err = check.RunValidate()
 	if err == nil {
 		t.Error("Expected error, but got no error :")
+	}
+}
+
+func TestValidSlice(t *testing.T) {
+	payload := map[string]interface{}{"hobby": []string{"reading", "football"}}
+	validRole := map[string]map_validator.Rules{
+		"hobby": {Type: reflect.Slice},
+	}
+	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+	}
+	_, err = check.RunValidate()
+	if err != nil {
+		t.Error("Expected no error, but we got :", err)
+	}
+
+	//invalidPayload := map[string]interface{}{"hobby": 122}
+	invalidPayload := map[string]interface{}{"aaa": 122}
+	check, err = map_validator.NewValidateBuilder().SetRules(validRole).Load(invalidPayload)
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+	}
+	expected := "we need 'hobby' field"
+	_, err = check.RunValidate()
+	if err.Error() != expected {
+		t.Errorf("Expected %s, but we got : %s", expected, err)
+	}
+
+	invalidPayload = map[string]interface{}{"hobby": 122}
+	check, err = map_validator.NewValidateBuilder().SetRules(validRole).Load(invalidPayload)
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+	}
+	expected = "the field 'hobby' should be 'slice'"
+	_, err = check.RunValidate()
+	if err.Error() != expected {
+		t.Errorf("Expected %s, but we got : %s", expected, err)
+	}
+	//fmt.Println(err)
+}
+
+func TestInvalidSlice(t *testing.T) {
+	payload := map[string]interface{}{"hobby": []string{"reading", "football", "eat"}}
+	validRole := map[string]map_validator.Rules{
+		"hobby": {Type: reflect.Slice, Max: map_validator.SetTotal(2)},
+	}
+	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+	}
+	expected := "the field 'hobby' should be or lower than 2"
+	_, err = check.RunValidate()
+	if err.Error() != expected {
+		t.Errorf("Expected %s, but we got : %s", expected, err)
 	}
 }

@@ -260,7 +260,7 @@ func TestInvalidMultiMultiNestedValidation(t *testing.T) {
 	}
 }
 
-func TestOptionalInvalidMultiNestedValidation(t *testing.T) {
+func TestNotOptionalInvalidMultiNestedValidation(t *testing.T) {
 	type Orang struct {
 		Nama    string `map_validator:"nama" json:"nama"`
 		Umur    int    `map_validator:"umur" json:"umur"`
@@ -328,5 +328,115 @@ func TestOptionalInvalidMultiNestedValidation(t *testing.T) {
 	expected = "no data to Bind because last progress is error"
 	if err.Error() != expected {
 		t.Errorf("Expected : %s But you got : %s", expected, err)
+	}
+}
+
+func TestInvalidListMultiNestedValidation(t *testing.T) {
+	type Orang struct {
+		Nama    string `map_validator:"nama" json:"nama"`
+		Umur    int    `map_validator:"umur" json:"umur"`
+		Hoby    string `map_validator:"hoby" json:"hoby"`
+		JK      string `map_validator:"jenis_kelamin" json:"jenis_kelamin"`
+		Menikah bool   `map_validator:"menikah" json:"menikah"`
+		Anak    *Orang `map_validator:"anak" json:"anak"`
+	}
+	lastRole := map[string]map_validator.Rules{
+		"nama":          {Type: reflect.String},
+		"umur":          {Type: reflect.Int},
+		"hoby":          {Type: reflect.String, Null: true, IfNull: "-"},
+		"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
+		"menikah":       {Type: reflect.Bool, Null: true, IfNull: false},
+	}
+	secondRole := map[string]map_validator.Rules{
+		"nama":          {Type: reflect.String},
+		"umur":          {Type: reflect.Int},
+		"hoby":          {Type: reflect.String, Null: true, IfNull: "-"},
+		"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
+		"menikah":       {Type: reflect.Bool, Null: true, IfNull: false},
+		"anak-anak":     {ListObject: &lastRole},
+	}
+	rootRole := map[string]map_validator.Rules{
+		"nama":          {Type: reflect.String},
+		"umur":          {Type: reflect.Int},
+		"hoby":          {Type: reflect.String, Null: true, IfNull: "-"},
+		"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
+		"menikah":       {Type: reflect.Bool, Null: true, IfNull: false},
+		"anak":          {Object: &secondRole, Null: true},
+	}
+	validLastChild := []map[string]interface{}{
+		{
+			"nama":          "Messi",
+			"jenis_kelamin": "laki-laki",
+			"hoby":          "football",
+			"umur":          20,
+			"menikah":       true,
+		},
+	}
+	invalidLastChild := []map[string]interface{}{
+		{
+			"nama":          1122,
+			"jenis_kelamin": "laki-laki",
+			"hoby":          "football",
+			"umur":          20,
+			"menikah":       true,
+		},
+	}
+	lastChild := map[string]interface{}{
+		"nama":          "Messi",
+		"jenis_kelamin": "laki-laki",
+		"hoby":          "football",
+		"umur":          20,
+		"menikah":       true,
+	}
+	secondChild := map[string]interface{}{
+		"nama":          "Messi",
+		"jenis_kelamin": "laki-laki",
+		"hoby":          "football",
+		"umur":          20,
+		"menikah":       true,
+		"anak-anak":     lastChild,
+	}
+	payload := map[string]interface{}{
+		"nama":          "Arian Saputra",
+		"jenis_kelamin": "laki-laki",
+		"hoby":          "Main PS bro",
+		"umur":          33,
+		"menikah":       true,
+		"anak":          secondChild,
+	}
+	check, err := map_validator.NewValidateBuilder().SetRules(rootRole).Load(payload)
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+		return
+	}
+	_, err = check.RunValidate()
+	expected := "field 'anak-anak' is not valid list object"
+	if err.Error() != expected {
+		t.Errorf("Expected :%s. But you got : %s", expected, err)
+	}
+
+	secondChild["anak-anak"] = validLastChild
+	payload["anak"] = secondChild
+	check, err = map_validator.NewValidateBuilder().SetRules(rootRole).Load(payload)
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+		return
+	}
+	_, err = check.RunValidate()
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+	}
+
+	secondChild["anak-anak"] = invalidLastChild
+	payload["anak"] = secondChild
+	check, err = map_validator.NewValidateBuilder().SetRules(rootRole).Load(payload)
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+		return
+	}
+	_, err = check.RunValidate()
+	expected = "the field 'nama' should be 'string'"
+	if err.Error() != expected {
+		t.Errorf("Expected :%s. But you got : %s", expected, err)
 	}
 }
