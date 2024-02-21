@@ -42,6 +42,8 @@ type Rules struct {
 	IPv4OptionalPrefix bool
 	File               bool
 	RegexString        string
+	Object             *map[string]Rules
+	ListChild          *[]map[string]Rules
 
 	CustomMsg CustomMsg // will support soon
 }

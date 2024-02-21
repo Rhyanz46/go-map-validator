@@ -1,6 +1,7 @@
 package test
 
 import (
+	"fmt"
 	"github.com/Rhyanz46/go-map-validator/map_validator"
 	"reflect"
 	"testing"
@@ -222,11 +223,12 @@ func TestFilledAndNullField(t *testing.T) {
 	}
 	totalFilled := extraCheck.GetFilledField()
 	totalNull := extraCheck.GetNullField()
+	fmt.Println(extraCheck.GetData())
 	if len(totalFilled) != 2 {
-		t.Errorf("Expected 2, but got error : %v", totalFilled)
+		t.Errorf("Expected total data is 2, but we got %v data = (%v)", len(totalFilled), totalFilled)
 	}
 	if len(totalNull) != 1 {
-		t.Errorf("Expected 1, but got error : %v", totalFilled)
+		t.Errorf("Expected total data is 1, but we got %v data = (%v)", len(totalNull), totalNull)
 	}
 }
 

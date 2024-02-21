@@ -88,9 +88,31 @@ func buildMessage(msg string, meta MessageMeta) error {
 	return errors.New(msg)
 }
 
+func validateRecursive(key string, data map[string]interface{}, rule Rules, loadedFrom loadFromType) (interface{}, error) {
+	res, err := validate(key, data, rule, loadedFrom)
+	if err != nil {
+		return nil, err
+	}
+
+	if rule.Object != nil && res != nil {
+		for keyX, ruleX := range *rule.Object {
+			_, err := validateRecursive(keyX, res.(map[string]interface{}), ruleX, fromJSONEncoder)
+			if err != nil {
+				//if rule.CustomMsg != nil #TODO: custom message for nested object
+				return nil, err
+			}
+			//filledFields = append(filledFields, newFilledFields...) #TODO: get children fields fill or not filled
+			//nullFields = append(nullFields, newNullFields...)
+		}
+	}
+
+	return res, nil
+}
+
 func validate(field string, dataTemp map[string]interface{}, validator Rules, dataFrom loadFromType) (interface{}, error) {
 	//var oldIntType reflect.Kind
 	data := dataTemp[field]
+	//var isListObject bool
 
 	// null validation
 	if !validator.Null && data == nil {
@@ -105,23 +127,17 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 		return nil, nil
 	}
 
-	if validator.IsMapInterface {
-		m, ioData := data, new(bytes.Buffer)
-		var res map[string]interface{}
-		err := json.NewEncoder(ioData).Encode(&m)
+	if validator.IsMapInterface || validator.Object != nil {
+		res, err := toMapStringInterface(data)
 		if err != nil {
-			return nil, errors.New("validatorType in '" + field + "' field is not valid object")
-		}
-		err = json.NewDecoder(ioData).Decode(&res)
-		if err != nil {
-			return nil, errors.New("validatorType in '" + field + "' field is not valid object")
+			return nil, errors.New("field '" + field + "' is not valid object")
 		}
 		return res, nil
 	}
 
 	// validatorType type validation
 	dataType := reflect.TypeOf(data).Kind()
-	handleIntOnHttpJson := dataFrom == fromHttpJson && isIntegerFamily(validator.Type) && isIntegerFamily(dataType)
+	handleIntOnHttpJson := (dataFrom == fromHttpJson || dataFrom == fromJSONEncoder) && isIntegerFamily(validator.Type) && isIntegerFamily(dataType)
 	customData := !(!validator.UUID &&
 		!validator.IPV4 &&
 		!validator.UUIDToString &&
@@ -132,12 +148,12 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 		!validator.IPV4Network &&
 		validator.RegexString == "")
 
-	if dataType == reflect.Slice && !validator.Null && len(ToInterfaceSlice(data)) == 0 {
+	if dataType == reflect.Slice && !validator.Null && len(toInterfaceSlice(data)) == 0 {
 		return nil, errors.New("you need to input validatorType in '" + field + "' field")
 	}
 
 	if dataType != validator.Type && !customData && !handleIntOnHttpJson {
-		if dataFrom == fromHttpJson && isIntegerFamily(validator.Type) {
+		if (dataFrom == fromHttpJson || dataFrom == fromJSONEncoder) && isIntegerFamily(validator.Type) {
 			validator.Type = reflect.Int
 		}
 		if validator.CustomMsg.OnTypeNotMatch != nil {
@@ -346,7 +362,7 @@ func SetTotal(total int) *int {
 
 func SetMessage(msg string) *string { return &msg }
 
-func ToInterfaceSlice(slice interface{}) []interface{} {
+func toInterfaceSlice(slice interface{}) []interface{} {
 	s := reflect.ValueOf(slice)
 	if s.Kind() != reflect.Slice {
 		panic("InterfaceSlice() given a non-slice type")
@@ -363,6 +379,20 @@ func ToInterfaceSlice(slice interface{}) []interface{} {
 	}
 
 	return ret
+}
+
+func toMapStringInterface(data interface{}) (map[string]interface{}, error) {
+	m, ioData := data, new(bytes.Buffer)
+	var res map[string]interface{}
+	err := json.NewEncoder(ioData).Encode(&m)
+	if err != nil {
+		return nil, err
+	}
+	err = json.NewDecoder(ioData).Decode(&res)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 func convertValue(newValue interface{}, kind reflect.Kind, data reflect.Value, pointer bool) error {
