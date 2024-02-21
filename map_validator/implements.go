@@ -199,11 +199,25 @@ func (state *finalOperation) RunValidate() (*ExtraOperationData, error) {
 			return nil, err
 		}
 	}
-	for key, validationData := range *state.rules {
-		data, err := validate(key, state.data, validationData, state.loadedFrom)
+	for key, rule := range *state.rules {
+		data, err := validateRecursive(key, state.data, rule, state.loadedFrom)
 		if err != nil {
 			return nil, err
 		}
+		//data, err := validate(key, state.data, rule, state.loadedFrom)
+		//if err != nil {
+		//	return nil, err
+		//}
+		//if rule.Object != nil {
+		//	for keyX, ruleX := range *rule.Object {
+		//		_, err := validate(keyX, data.(map[string]interface{}), ruleX, fromJSONEncoder)
+		//		if err != nil {
+		//			//if rule.CustomMsg != nil #TODO: custom message for nested object
+		//			err = errors.New(fmt.Sprintf("error on object '%s' : '%s'", key, err))
+		//			return nil, err
+		//		}
+		//	}
+		//}
 		if data != nil {
 			filledFields = append(filledFields, key)
 		} else {

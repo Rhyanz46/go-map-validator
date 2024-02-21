@@ -14,4 +14,5 @@ const (
 	fromHttpJson loadFromType = iota
 	fromHttpMultipartForm
 	fromMapString
+	fromJSONEncoder
 )

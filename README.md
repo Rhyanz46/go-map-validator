@@ -25,6 +25,7 @@ go get github.com/Rhyanz46/go-map-validator/map_validator
 - IPv4 field check
 - IPv4 Network check
 - regex on string validation
+- nested validation 🔥
 - you can create your own extension 🔥🔥🔥🔥 (example : [https://github.com/Rhyanz46/go-map-validator/example_extensions/](https://github.com/Rhyanz46/go-map-validator/tree/main/example_extensions))
 - custom message :
     - on invalid regex message : ✅
@@ -49,7 +50,6 @@ go get github.com/Rhyanz46/go-map-validator/map_validator
 
 - avoiding same value in some field
     - ex case : `old_password` and `new_password`
-- nested validation
 - get from urls params http
 - validation for `base64`
 - handle file size on multipart
