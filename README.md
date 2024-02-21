@@ -83,7 +83,27 @@ if err == nil {
 }
 ```
 
-### Example Echo Framework
+### Example 2 ( Nested Object Validation )
+```go
+filterRole := map[string]map_validator.Rules{
+    "search":          {Type: reflect.String, Null: true},
+    "organization_id": {UUID: true, Null: true},
+}
+jsonDataRoles := map_validator.NewValidateBuilder().StrictKeys().SetRules(map[string]map_validator.Rules{
+    "filter":        {Object: &filterRole, Null: true},
+    "rows_per_page": {Type: reflect.Int64, Null: true},
+    "page_index":    {Type: reflect.Int64, Null: true},
+    "sort": {
+        Null:   true,
+        IfNull: "FULL_NAME:DESC",
+        Type:   reflect.String, Enum: &map_validator.EnumField[any]{
+            Items: []string{"FULL_NAME:DESC", "FULL_NAME:ASC", "EMAIL:ASC", "EMAIL:DESC"},
+        },
+    },
+})
+```
+
+### Example 3 ( Echo Framework )
 ```go
 func handleLogin(c echo.Context) error {
     jsonHttp, err := map_validator.NewValidateBuilder().SetRules(map[string]map_validator.Rules{
@@ -108,7 +128,7 @@ func main() {
 
 ```
 
-### Example Bind To Struct
+### Example 4 ( Bind To Struct )
 ```go
 type Data struct {
     JK      string `map_validator:"jenis_kelamin"`
@@ -142,7 +162,7 @@ if testBind.JK != payload["jenis_kelamin"] {
 ```
 
 
-### Example custom message 
+### Example 5 ( Custom message )
 ```go
 payload := map[string]interface{}{"total": 12, "unit": "KG"}
 validRole := map[string]map_validator.Rules{
@@ -164,7 +184,7 @@ if err != nil {
 ```
 
 
-### Example for regex validator
+### Example 6 ( Regex validator )
 ```go
 payload := map[string]interface{}{"hp": "+62567888", "email": "dev@ariansaputra.com"}
 validRole := map[string]map_validator.Rules{
