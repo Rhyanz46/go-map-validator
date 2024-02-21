@@ -4,7 +4,7 @@ Thank you for your interest in contributing to our project! We greatly appreciat
 
 ## Issues
 
-If you find a bug, have an idea for a new feature, or want to suggest an improvement, please open an [Issue](link_issue) in this repository. Be sure to clearly explain the issue and provide any relevant additional information.
+If you find a bug, have an idea for a new feature, or want to suggest an improvement, please open an [Issue](https://github.com/Rhyanz46/go-map-validator/issues) in this repository. Be sure to clearly explain the issue and provide any relevant additional information.
 
 ## Code Contributions
 
@@ -23,10 +23,10 @@ We will review your PR as soon as possible. Please be patient, and we'll do our 
 
 ## License
 
-By contributing to this project, you agree that your contributions will be licensed under the [project's license](link_license).
+By contributing to this project, you agree that your contributions will be licensed under the [project's license](https://github.com/Rhyanz46/go-map-validator/blob/main/LICENSE).
 
 ## Contact
 
-If you have any questions or need further assistance, feel free to contact us at [email@example.com].
+If you have any questions or need further assistance, feel free to contact us at [rianariansaputra@gmail.com] or [join our telegram](https://t.me/addlist/Wi84VFNkvz85MWFl)
 
 Thank you for your contribution!
