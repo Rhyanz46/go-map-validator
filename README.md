@@ -48,15 +48,14 @@ go get github.com/Rhyanz46/go-map-validator/map_validator
 
 ## Road Map
 
-- avoiding same value in some field
-    - ex case : `old_password` and `new_password`
+- Unique Value 
+    - ex case : `old_password` and `new_password` cant be using same value
 - get from urls params http
 - validation for `base64`
 - handle file size on multipart
 - extension for generate OpenAPI Spec that support with this package
 - image resolution validation
-- OR validation (ex : IPv4: true, UUID: true, MultipleCondition: true)
-- Custom Validation
+- multi validation on one field (ex : IPv4: true, UUID: true)
 
 
 ## example :
