@@ -451,171 +451,171 @@ func toMapStringInterface(data interface{}) (map[string]interface{}, error) {
 	return res, nil
 }
 
-func convertValue(newValue interface{}, kind reflect.Kind, data reflect.Value, pointer bool) error {
-	errNotSupport := errors.New("not support data")
-	switch kind {
+func changeValue(newValue interface{}, dataType reflect.Kind, destination reflect.Value, pointer bool) error {
+	errNotSupport := errors.New("not support destination")
+	switch dataType {
 	case reflect.Int:
-		converted, ok := newValue.(float64)
+		converted, ok := newValue.(int)
 		if !ok {
-			return errNotSupport
+			converted = int(reflect.ValueOf(newValue).Int())
 		}
 		if pointer {
-			data.Set(reflect.ValueOf(&converted))
+			destination.Set(reflect.ValueOf(&converted))
 		} else {
-			data.SetInt(int64(converted))
+			destination.SetInt(int64(converted))
 		}
 	case reflect.Int8:
-		converted, ok := newValue.(int64)
+		converted, ok := newValue.(int8)
 		if !ok {
-			return errNotSupport
+			converted = int8(reflect.ValueOf(newValue).Int())
 		}
 		if pointer {
-			data.Set(reflect.ValueOf(&converted))
+			destination.Set(reflect.ValueOf(&converted))
 		} else {
-			data.SetInt(converted)
+			destination.SetInt(int64(converted))
 		}
 	case reflect.Int16:
-		converted, ok := newValue.(int64)
+		converted, ok := newValue.(int16)
 		if !ok {
-			return errNotSupport
+			converted = int16(reflect.ValueOf(newValue).Int())
 		}
 		if pointer {
-			data.Set(reflect.ValueOf(&converted))
+			destination.Set(reflect.ValueOf(&converted))
 		} else {
-			data.SetInt(converted)
+			destination.SetInt(int64(converted))
 		}
 	case reflect.Int32:
-		converted, ok := newValue.(int64)
+		converted, ok := newValue.(int32)
 		if !ok {
-			return errNotSupport
+			converted = int32(reflect.ValueOf(newValue).Int())
 		}
 		if pointer {
-			data.Set(reflect.ValueOf(&converted))
+			destination.Set(reflect.ValueOf(&converted))
 		} else {
-			data.SetInt(converted)
+			destination.SetInt(int64(converted))
 		}
 	case reflect.Int64:
 		converted, ok := newValue.(int64)
 		if !ok {
-			return errNotSupport
+			converted = reflect.ValueOf(newValue).Int()
 		}
 		if pointer {
-			data.Set(reflect.ValueOf(&converted))
+			destination.Set(reflect.ValueOf(&converted))
 		} else {
-			data.SetInt(converted)
+			destination.SetInt(converted)
 		}
 	case reflect.Uint:
-		converted, ok := newValue.(float64)
+		converted, ok := newValue.(uint)
 		if !ok {
-			return errNotSupport
+			converted = uint(reflect.ValueOf(newValue).Uint())
 		}
 		if pointer {
-			data.Set(reflect.ValueOf(&converted))
+			destination.Set(reflect.ValueOf(&converted))
 		} else {
-			data.SetUint(uint64(converted))
+			destination.SetUint(uint64(converted))
 		}
 	case reflect.Uint8:
-		converted, ok := newValue.(float64)
+		converted, ok := newValue.(uint8)
 		if !ok {
-			return errNotSupport
+			converted = uint8(reflect.ValueOf(newValue).Int())
 		}
 		if pointer {
-			data.Set(reflect.ValueOf(&converted))
+			destination.Set(reflect.ValueOf(&converted))
 		} else {
-			data.SetUint(uint64(converted))
+			destination.SetUint(uint64(converted))
 		}
 	case reflect.Uint16:
-		converted, ok := newValue.(float64)
+		converted, ok := newValue.(uint16)
 		if !ok {
-			return errNotSupport
+			converted = uint16(reflect.ValueOf(newValue).Int())
 		}
 		if pointer {
-			data.Set(reflect.ValueOf(&converted))
+			destination.Set(reflect.ValueOf(&converted))
 		} else {
-			data.SetUint(uint64(converted))
+			destination.SetUint(uint64(converted))
 		}
 	case reflect.Uint32:
-		converted, ok := newValue.(float64)
+		converted, ok := newValue.(uint32)
 		if !ok {
-			return errNotSupport
+			converted = uint32(reflect.ValueOf(newValue).Int())
 		}
 		if pointer {
-			data.Set(reflect.ValueOf(&converted))
+			destination.Set(reflect.ValueOf(&converted))
 		} else {
-			data.SetUint(uint64(converted))
+			destination.SetUint(uint64(converted))
 		}
 	case reflect.Uint64:
-		converted, ok := newValue.(float64)
+		converted, ok := newValue.(uint64)
 		if !ok {
-			return errNotSupport
+			converted = uint64(reflect.ValueOf(newValue).Int())
 		}
 		if pointer {
-			data.Set(reflect.ValueOf(&converted))
+			destination.Set(reflect.ValueOf(&converted))
 		} else {
-			data.SetUint(uint64(converted))
+			destination.SetUint(converted)
 		}
 	case reflect.Float32:
-		converted, ok := newValue.(float64)
+		converted, ok := newValue.(float32)
 		if !ok {
-			return errNotSupport
+			converted = float32(reflect.ValueOf(newValue).Int())
 		}
 		if pointer {
-			data.Set(reflect.ValueOf(&converted))
+			destination.Set(reflect.ValueOf(&converted))
 		} else {
-			data.SetFloat(float64(converted))
+			destination.SetFloat(float64(converted))
 		}
 	case reflect.Float64:
 		converted, ok := newValue.(float64)
 		if !ok {
-			return errNotSupport
+			converted = reflect.ValueOf(newValue).Float()
 		}
 		if pointer {
-			data.Set(reflect.ValueOf(&converted))
+			destination.Set(reflect.ValueOf(&converted))
 		} else {
-			data.SetFloat(converted)
+			destination.SetFloat(converted)
 		}
 	case reflect.String:
 		converted, ok := newValue.(string)
 		if !ok {
-			return errNotSupport
+			converted = reflect.ValueOf(newValue).String()
 		}
 		if pointer {
-			data.Set(reflect.ValueOf(&converted))
+			destination.Set(reflect.ValueOf(&converted))
 		} else {
-			data.SetString(converted)
+			destination.SetString(converted)
 		}
 	case reflect.Bool:
 		converted, ok := newValue.(bool)
 		if !ok {
-			return errNotSupport
+			converted = reflect.ValueOf(newValue).Bool()
 		}
 		if pointer {
-			data.Set(reflect.ValueOf(&converted))
+			destination.Set(reflect.ValueOf(&converted))
 		} else {
-			data.SetBool(converted)
+			destination.SetBool(converted)
 		}
 	case reflect.Complex64:
-		converted, ok := newValue.(complex128)
+		converted, ok := newValue.(complex64)
 		if !ok {
-			return errNotSupport
+			converted = complex64(reflect.ValueOf(newValue).Complex())
 		}
 		if pointer {
-			data.Set(reflect.ValueOf(&converted))
+			destination.Set(reflect.ValueOf(&converted))
 		} else {
-			data.SetComplex(complex128(complex64(converted)))
+			destination.SetComplex(complex128(converted))
 		}
 	case reflect.Complex128:
 		converted, ok := newValue.(complex128)
 		if !ok {
-			return errNotSupport
+			converted = reflect.ValueOf(newValue).Complex()
 		}
 		if pointer {
-			data.Set(reflect.ValueOf(&converted))
+			destination.Set(reflect.ValueOf(&converted))
 		} else {
-			data.SetComplex(converted)
+			destination.SetComplex(converted)
 		}
 	case reflect.Interface:
-		data.Set(reflect.ValueOf(newValue))
+		destination.Set(reflect.ValueOf(newValue))
 	default:
 		return errNotSupport
 	}
@@ -647,4 +647,185 @@ func isIntegerFamily(dataType reflect.Kind) bool {
 		return true
 	}
 	return false
+}
+
+func UpdateValueByTag(tagName string, i interface{}, data map[string]interface{}) error {
+	val := reflect.ValueOf(i)
+	if val.Kind() != reflect.Ptr || val.Elem().Kind() != reflect.Struct {
+		panic("need struct pointer!")
+	}
+
+	fmt.Println("val.Kind()--", val.Kind())
+	return updateFieldsByTag(tagName, val.Elem(), data)
+}
+
+func updateFieldsByTag(tagName string, target reflect.Value, data map[string]interface{}) error {
+	targetType := target.Type()
+
+	for indexTarget := 0; indexTarget < targetType.NumField(); indexTarget++ {
+		field := targetType.Field(indexTarget)
+		tag := field.Tag.Get(tagName)
+		fmt.Println("GGGGG", tag, data)
+		if tag == "" {
+			fmt.Println("skipped", tag, data, field.Name)
+			continue
+		}
+
+		if !field.IsExported() || data[tag] == nil {
+			fmt.Println("skipped", tag)
+			continue
+		}
+
+		if !target.Field(indexTarget).CanSet() {
+			fmt.Println("skipped", tag)
+			continue
+		}
+
+		switch field.Type.Kind() {
+		case reflect.Ptr:
+			if reflect.TypeOf(data[tag]).Kind() == field.Type.Elem().Kind() {
+				err := changeValue(data[tag], field.Type.Elem().Kind(), target.Field(indexTarget), true)
+				if err != nil {
+					return err
+				}
+			}
+		case reflect.Interface:
+			if reflect.TypeOf(data[tag]).Kind() == reflect.Map {
+				err := changeValue(data[tag], field.Type.Kind(), target.Field(indexTarget), false)
+				if err != nil {
+					return err
+				}
+			}
+		case reflect.Struct:
+			//fmt.Println("-----------", tag, data[tag])
+			if reflect.TypeOf(data[tag]).Kind() == reflect.Map {
+				valX := reflect.ValueOf(target.Field(indexTarget))
+				//fmt.Println("xxxxxxxxxxx", tag, data[tag], valX.Kind(), valX.Elem())
+				if valX.Kind() != reflect.Ptr || valX.Elem().Kind() != reflect.Struct {
+					continue
+				}
+				//fmt.Println("ddddd", tag, data[tag])
+				err := updateFieldsByTag(tagName, valX.Field(indexTarget), data[tag].(map[string]interface{}))
+				if err != nil {
+					return err
+				}
+			}
+		case reflect.Slice:
+			valSlice := reflect.ValueOf(data[tag])
+			for x := 0; x < valSlice.Len(); x++ {
+				txData := valSlice.Index(x)
+				kind := txData.Kind()
+				if kind == reflect.Map {
+					//continue
+					xData := txData.Interface().(map[string]interface{})
+					var fields []reflect.StructField
+					for xxx := 0; xxx < target.Type().Field(indexTarget).Type.Elem().NumField(); xxx++ {
+						fieldX := target.Type().Field(indexTarget).Type.Elem().Field(xxx)
+						fields = append(fields, reflect.StructField{
+							Name:      fieldX.Name,
+							PkgPath:   fieldX.PkgPath,
+							Type:      fieldX.Type,
+							Tag:       fieldX.Tag,
+							Offset:    fieldX.Offset,
+							Index:     fieldX.Index,
+							Anonymous: fieldX.Anonymous,
+						})
+					}
+
+					//valX := reflect.ValueOf(target.Field(indexTarget))
+					//if valX.Kind() != reflect.Ptr || valX.Elem().Kind() != reflect.Struct {
+					//	continue
+					//}
+
+					//err := updateFieldsByTag(tagName, reflect.ValueOf(target.Type().Field(indexTarget).Type.Elem()).Elem(), valSlice.Index(x).Interface().(map[string]interface{}))
+					//if err != nil {
+					//	return err
+					//}
+
+					//for _, key := range valSlice.Index(x).MapKeys() {
+					//	fmt.Println(key)
+					//}
+					fmt.Println("--yy--")
+					newData := reflect.New(reflect.StructOf(fields)).Elem()
+
+					valSlice.Index(x).Len()
+
+					fmt.Println("new \t\t: ", newData)
+					fmt.Println("data\t\t: ", &xData)
+					fmt.Println("len data\t: ", len(xData))
+					fmt.Println("destination 0\t: ", target.Interface())
+					fmt.Println("destination 1\t: ", target.Interface())
+					fmt.Println("destination 2\t: ", reflect.ValueOf(target.Type().Field(indexTarget).Type.Elem()).Elem())
+					fmt.Println("destination 3\t: ", target.Field(indexTarget).Len())
+					//for xxx := 0; xxx < target.Type().Field(indexTarget).Type.Elem().NumField(); xxx++ {
+					//	ffieldx := target.Type().Field(indexTarget).Type.Elem().Field(xxx)
+					//	fmt.Println("ffieldx.Name", ffieldx.Name, ffieldx.Tag.Get("json"))
+					//}
+
+					newSlice := reflect.MakeSlice(target.Field(indexTarget).Type(), 0, 0)
+					//newSlice := reflect.MakeSlice(target.Field(indexTarget).Type(), valSlice.Index(x).Len(), valSlice.Index(x).Len())
+
+					sliceValue := target.Field(indexTarget)
+
+					fmt.Println("before")
+					fmt.Println(newData)
+
+					for indexNewData := 0; indexNewData < newData.Type().NumField(); indexNewData++ {
+						//ttt.FieldByName(ttt.Type().Field(indexNewData).Name)
+						newData.FieldByName("Nama").SetString("Hello")
+
+						a := reflect.ValueOf(xData[newData.Type().Field(indexNewData).Tag.Get("json")])
+						fmt.Println(newData.Type().Field(indexNewData).Name, xData[newData.Type().Field(indexNewData).Tag.Get("json")], "------------a-----", a.Kind())
+						//val := reflect.ValueOf(i)
+						//if val.Kind() != reflect.Ptr || val.Elem().Kind() != reflect.Struct {
+						//	panic("need struct pointer!")
+						//}
+
+					}
+
+					err := updateFieldsByTag(tagName, reflect.ValueOf(&newData).Elem(), xData)
+					if err != nil {
+						return err
+					}
+
+					fmt.Println("after")
+					fmt.Println(newData)
+
+					newSlice = reflect.Append(sliceValue, newData)
+					sliceValue.Set(newSlice)
+					//target.Field(indexTarget).Set(newSlice)
+
+					//err := updateFieldsByTag(tagName, reflect.ValueOf(aaa), valSlice.Index(x).Interface().(map[string]interface{}))
+					//if err != nil {
+					//	return err
+					//}
+
+					//reflect.ValueOf(i).Elem()
+					fmt.Println("destination 4\t: ", target.Field(indexTarget).Len())
+					fmt.Println("destination 5\t: ", target.Field(indexTarget).Interface())
+					fmt.Println("destination 6\t: ", target.Type().Field(indexTarget).Type.Elem())
+
+					fmt.Println("--yy--")
+					fmt.Println()
+
+					//valX := reflect.ValueOf(valSlice.Index(indexTarget))
+					//if valX.Kind() != reflect.Ptr || valX.Elem().Kind() != reflect.Struct {
+					//	continue
+					//}
+					//err := updateFieldsByTag(tagName, reflect.ValueOf(aaa), valSlice.Index(x).Interface().(map[string]interface{}))
+					//if err != nil {
+					//	return err
+					//}
+				}
+			}
+		default:
+			if reflect.TypeOf(data[tag]).Kind() == field.Type.Kind() && field.Type.Kind() != reflect.Struct {
+				err := changeValue(data[tag], field.Type.Kind(), target.Field(indexTarget), false)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
