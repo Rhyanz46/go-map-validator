@@ -1,4 +1,4 @@
-# simple validator using struct properties as rules
+# Simple Validator using struct properties as rules
 
 You can integrate with all golang framework using `http.Request` interface
 
