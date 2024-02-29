@@ -12,15 +12,19 @@ func TestMultipleValidation(t *testing.T) {
 		Hoby    string `map_validator:"hoby" json:"hoby"`
 		Menikah bool   `map_validator:"menikah" json:"menikah"`
 	}
-	validRole := map[string]map_validator.Rules{
-		"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
-		"hoby":          {Type: reflect.String, Null: false},
-		"menikah":       {Type: reflect.Bool, Null: false},
+	validRole := map_validator.RulesWrapper{
+		Rules: map[string]map_validator.Rules{
+			"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
+			"hoby":          {Type: reflect.String, Null: false},
+			"menikah":       {Type: reflect.Bool, Null: false},
+		},
 	}
-	validRoleOptionalMenikah := map[string]map_validator.Rules{
-		"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
-		"hoby":          {Type: reflect.String, Null: false},
-		"menikah":       {Type: reflect.Bool, Null: true},
+	validRoleOptionalMenikah := map_validator.RulesWrapper{
+		Rules: map[string]map_validator.Rules{
+			"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
+			"hoby":          {Type: reflect.String, Null: false},
+			"menikah":       {Type: reflect.Bool, Null: true},
+		},
 	}
 	payload := map[string]interface{}{"jenis_kelamin": "laki-laki", "hoby": "Main PS bro", "umur": 1, "menikah": true}
 	notFullPayload := map[string]interface{}{"jenis_kelamin": "laki-laki", "hoby": "Main PS bro", "umur": 1}
@@ -46,10 +50,12 @@ func TestMultipleValidation(t *testing.T) {
 		t.Errorf("Expected : %s But you got : %s", payload["jenis_kelamin"], testBind.JK)
 	}
 
-	check, err = map_validator.NewValidateBuilder().SetRules(map[string]map_validator.Rules{
-		"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
-		"hoby":          {Type: reflect.Int, Null: false},
-		"menikah":       {Type: reflect.Bool, Null: false},
+	check, err = map_validator.NewValidateBuilder().SetRules(map_validator.RulesWrapper{
+		Rules: map[string]map_validator.Rules{
+			"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
+			"hoby":          {Type: reflect.Int, Null: false},
+			"menikah":       {Type: reflect.Bool, Null: false},
+		},
 	}).Load(payload)
 	if err != nil {
 		t.Errorf("Expected not have error, but got error : %s", err)
@@ -123,10 +129,12 @@ func TestPointerFieldBinding(t *testing.T) {
 		Hoby    *string `map_validator:"hoby" json:"hoby"`
 		Menikah bool    `map_validator:"menikah" json:"menikah"`
 	}
-	validRole := map[string]map_validator.Rules{
-		"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
-		"hoby":          {Type: reflect.String, Null: true},
-		"menikah":       {Type: reflect.Bool, Null: false},
+	validRole := map_validator.RulesWrapper{
+		Rules: map[string]map_validator.Rules{
+			"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
+			"hoby":          {Type: reflect.String, Null: true},
+			"menikah":       {Type: reflect.Bool, Null: false},
+		},
 	}
 
 	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
@@ -166,11 +174,13 @@ func TestInterfaceFieldBinding(t *testing.T) {
 		Menikah  bool        `map_validator:"menikah" json:"menikah"`
 		ListData interface{} `map_validator:"list_data" json:"list_data"`
 	}
-	validRole := map[string]map_validator.Rules{
-		"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
-		"hoby":          {Type: reflect.String, Null: true},
-		"menikah":       {Type: reflect.Bool, Null: false},
-		"list_data":     {IsMapInterface: true},
+	validRole := map_validator.RulesWrapper{
+		Rules: map[string]map_validator.Rules{
+			"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
+			"hoby":          {Type: reflect.String, Null: true},
+			"menikah":       {Type: reflect.Bool, Null: false},
+			"list_data":     {IsMapInterface: true},
+		},
 	}
 
 	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
@@ -207,11 +217,12 @@ func TestInterfaceFieldBinding(t *testing.T) {
 
 func TestFilledAndNullField(t *testing.T) {
 	payload := map[string]interface{}{"nama": "arian", "umur": 1}
-	validRole := map[string]map_validator.Rules{
-		"nama": {Type: reflect.String},
-		"hoby": {Type: reflect.String, Null: true},
-		"umur": {Type: reflect.Int, Null: false},
-	}
+	validRole := map_validator.RulesWrapper{
+		Rules: map[string]map_validator.Rules{
+			"nama": {Type: reflect.String},
+			"hoby": {Type: reflect.String, Null: true},
+			"umur": {Type: reflect.Int, Null: false},
+		}}
 	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
 	if err != nil {
 		t.Errorf("Expected not have error, but got error : %s", err)
@@ -232,10 +243,12 @@ func TestFilledAndNullField(t *testing.T) {
 
 func TestGetMapData(t *testing.T) {
 	payload := map[string]interface{}{"nama": "arian", "umur": 1}
-	validRole := map[string]map_validator.Rules{
-		"nama": {Type: reflect.String},
-		"hoby": {Type: reflect.String, Null: true},
-		"umur": {Type: reflect.Int, Null: false},
+	validRole := map_validator.RulesWrapper{
+		Rules: map[string]map_validator.Rules{
+			"nama": {Type: reflect.String},
+			"hoby": {Type: reflect.String, Null: true},
+			"umur": {Type: reflect.Int, Null: false},
+		},
 	}
 	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
 	if err != nil {
@@ -255,17 +268,39 @@ func TestGetMapData(t *testing.T) {
 
 func TestStrict(t *testing.T) {
 	payload := map[string]interface{}{"nama": "arian", "umur": 1, "favorite": "coklat"}
-	validRole := map[string]map_validator.Rules{
-		"nama": {Type: reflect.String},
-		"hoby": {Type: reflect.String, Null: true},
-		"umur": {Type: reflect.Int, Null: false},
+	validRole := map_validator.RulesWrapper{
+		Rules: map[string]map_validator.Rules{
+			"nama": {Type: reflect.String},
+			"hoby": {Type: reflect.String, Null: true},
+			"umur": {Type: reflect.Int, Null: false},
+		},
+		Setting: map_validator.Setting{Strict: true},
 	}
-	check, err := map_validator.NewValidateBuilder().StrictKeys().SetRules(validRole).Load(payload)
+	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+	}
 	expected := "'favorite' is not allowed key"
+	_, err = check.RunValidate()
 	if err.Error() != expected {
 		t.Errorf("Expected %s, but we got : %s", expected, err)
 	}
-	expected = "no data to Validate because last progress is error"
+}
+
+func TestStrictTwo(t *testing.T) {
+	payload := map[string]interface{}{"nama": "arian", "umur": 1}
+	validRole := map_validator.RulesWrapper{
+		Rules: map[string]map_validator.Rules{
+			"nama": {Type: reflect.String},
+			"hoby": {Type: reflect.String, Null: true},
+		},
+		Setting: map_validator.Setting{Strict: true},
+	}
+	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+	}
+	expected := "'umur' is not allowed key"
 	_, err = check.RunValidate()
 	if err.Error() != expected {
 		t.Errorf("Expected %s, but we got : %s", expected, err)
@@ -274,9 +309,11 @@ func TestStrict(t *testing.T) {
 
 func TestValidRegex(t *testing.T) {
 	payload := map[string]interface{}{"hp": "+62567888", "email": "dev@ariansaputra.com"}
-	validRole := map[string]map_validator.Rules{
-		"hp":    {RegexString: `^\+(?:\d{2}[- ]?\d{6}|\d{11})$`},
-		"email": {RegexString: `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`},
+	validRole := map_validator.RulesWrapper{
+		Rules: map[string]map_validator.Rules{
+			"hp":    {RegexString: `^\+(?:\d{2}[- ]?\d{6}|\d{11})$`},
+			"email": {RegexString: `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`},
+		},
 	}
 	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
 	if err != nil {
@@ -290,8 +327,10 @@ func TestValidRegex(t *testing.T) {
 
 func TestInvalidRegex(t *testing.T) {
 	payload := map[string]interface{}{"hp": "62567888", "email": "devariansaputra.com"}
-	validRole := map[string]map_validator.Rules{
-		"hp": {RegexString: `^\+(?:\d{2}[- ]?\d{6}|\d{11})$`},
+	validRole := map_validator.RulesWrapper{
+		Rules: map[string]map_validator.Rules{
+			"hp": {RegexString: `^\+(?:\d{2}[- ]?\d{6}|\d{11})$`},
+		},
 	}
 	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
 	if err != nil {
@@ -301,8 +340,10 @@ func TestInvalidRegex(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error, but got no error :")
 	}
-	validRole = map[string]map_validator.Rules{
-		"email": {RegexString: `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`},
+	validRole = map_validator.RulesWrapper{
+		Rules: map[string]map_validator.Rules{
+			"email": {RegexString: `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`},
+		},
 	}
 	check, err = map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
 	if err != nil {
@@ -316,8 +357,10 @@ func TestInvalidRegex(t *testing.T) {
 
 func TestValidSlice(t *testing.T) {
 	payload := map[string]interface{}{"hobby": []string{"reading", "football"}}
-	validRole := map[string]map_validator.Rules{
-		"hobby": {Type: reflect.Slice},
+	validRole := map_validator.RulesWrapper{
+		Rules: map[string]map_validator.Rules{
+			"hobby": {Type: reflect.Slice},
+		},
 	}
 	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
 	if err != nil {
@@ -355,8 +398,10 @@ func TestValidSlice(t *testing.T) {
 
 func TestInvalidSlice(t *testing.T) {
 	payload := map[string]interface{}{"hobby": []string{"reading", "football", "eat"}}
-	validRole := map[string]map_validator.Rules{
-		"hobby": {Type: reflect.Slice, Max: map_validator.SetTotal(2)},
+	validRole := map_validator.RulesWrapper{
+		Rules: map[string]map_validator.Rules{
+			"hobby": {Type: reflect.Slice, Max: map_validator.SetTotal(2)},
+		},
 	}
 	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
 	if err != nil {

@@ -3,13 +3,13 @@ package example_extensions
 import "github.com/Rhyanz46/go-map-validator/map_validator"
 
 type ExampleExtension struct {
-	rules                *map[string]map_validator.Rules
+	rules                map_validator.RulesWrapper
 	data                 interface{}
 	resetAfterValidation bool
 	extraData            *map_validator.ExtraOperationData
 }
 
-func (e *ExampleExtension) SetRoles(rules *map[string]map_validator.Rules) {
+func (e *ExampleExtension) SetRoles(rules map_validator.RulesWrapper) {
 	e.rules = rules
 }
 

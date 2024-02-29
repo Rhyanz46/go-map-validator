@@ -3,7 +3,6 @@ package map_validator
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"reflect"
 )
@@ -12,31 +11,28 @@ func NewValidateBuilder() *ruleState {
 	return &ruleState{}
 }
 
-func (state *ruleState) SetRules(validations map[string]Rules) *dataState {
-	if len(validations) == 0 {
+func (state *ruleState) SetRules(validations RulesWrapper) *dataState {
+	if len(validations.Rules) == 0 {
 		panic("you need to set roles")
 	}
 
 	var tempExt []ExtensionType
-	state.rules = validations
+	state.rules = &validations
 
 	for _, ex := range state.extension {
-		ex.SetRoles(&state.rules)
-		tempExt = append(tempExt, ex)
+		if state.rules != nil {
+			ex.SetRoles(*state.rules)
+			tempExt = append(tempExt, ex)
+		}
 	}
 	if len(tempExt) > 0 {
 		state.extension = tempExt
 	}
 	return &dataState{
-		rules:              &state.rules,
+		rules:              state.rules,
 		extension:          state.extension,
 		strictAllowedValue: state.strictAllowedValue,
 	}
-}
-
-func (state *ruleState) StrictKeys() *ruleState {
-	state.strictAllowedValue = true
-	return state
 }
 
 func (state *ruleState) AddExtension(extension ExtensionType) *ruleState {
@@ -44,25 +40,25 @@ func (state *ruleState) AddExtension(extension ExtensionType) *ruleState {
 	return state
 }
 
-func (state *dataState) checkStrictKeys(data map[string]interface{}) error {
-	var allowedKeys []string
-	keys := getAllKeys(data)
-	for key, _ := range *state.rules {
-		allowedKeys = append(allowedKeys, key)
-	}
-	for _, key := range keys {
-		if !isDataInList(key, allowedKeys) {
-			return errors.New(fmt.Sprintf("'%s' is not allowed key", key))
-		}
-	}
-	return nil
-}
+//	func (state *dataState) checkStrictKeys(data map[string]interface{}) error {
+//		var allowedKeys []string
+//		keys := getAllKeys(data)
+//		for key, _ := range state.rules.Rules {
+//			allowedKeys = append(allowedKeys, key)
+//		}
+//		for _, key := range keys {
+//			if !isDataInList(key, allowedKeys) {
+//				return errors.New(fmt.Sprintf("'%s' is not allowed key", key))
+//			}
+//		}
+//		return nil
+//	}
 func (state *dataState) Load(data map[string]interface{}) (*finalOperation, error) {
-	if state.strictAllowedValue {
-		if err := state.checkStrictKeys(data); err != nil {
-			return nil, err
-		}
-	}
+	//if state.strictAllowedValue {
+	//	if err := state.checkStrictKeys(data); err != nil {
+	//		return nil, err
+	//	}
+	//}
 	for _, ex := range state.extension {
 		err := ex.BeforeLoad(&data)
 		if err != nil {
@@ -104,11 +100,11 @@ func (state *dataState) LoadJsonHttp(r *http.Request) (*finalOperation, error) {
 		}
 		mapData = make(map[string]interface{})
 	}
-	if state.strictAllowedValue {
-		if err := state.checkStrictKeys(mapData); err != nil {
-			return nil, err
-		}
-	}
+	//if state.strictAllowedValue {
+	//	if err := state.checkStrictKeys(mapData); err != nil {
+	//		return nil, err
+	//	}
+	//}
 	for _, ex := range state.extension {
 		err := ex.AfterLoad(&mapData)
 		if err != nil {
@@ -138,7 +134,7 @@ func (state *dataState) LoadFormHttp(r *http.Request) (*finalOperation, error) {
 	}
 	mapData := map[string]interface{}{}
 	allowType := []reflect.Kind{reflect.String, reflect.Int, reflect.Bool}
-	for key, rule := range *state.rules {
+	for key, rule := range state.rules.Rules {
 		var isAllowType bool
 		if rule.File {
 			file, fileInfo, err := r.FormFile(key)
@@ -168,11 +164,11 @@ func (state *dataState) LoadFormHttp(r *http.Request) (*finalOperation, error) {
 			}
 		}
 	}
-	if state.strictAllowedValue {
-		if err := state.checkStrictKeys(mapData); err != nil {
-			return nil, err
-		}
-	}
+	//if state.strictAllowedValue {
+	//	if err := state.checkStrictKeys(mapData); err != nil {
+	//		return nil, err
+	//	}
+	//}
 	for _, ex := range state.extension {
 		err := ex.AfterLoad(&mapData)
 		if err != nil {
@@ -199,25 +195,11 @@ func (state *finalOperation) RunValidate() (*ExtraOperationData, error) {
 			return nil, err
 		}
 	}
-	for key, rule := range *state.rules {
-		data, err := validateRecursive(key, state.data, rule, state.loadedFrom)
+	for key, rule := range state.rules.Rules {
+		data, err := validateRecursive(state.rules, key, state.data, rule, state.loadedFrom)
 		if err != nil {
 			return nil, err
 		}
-		//data, err := validate(key, state.data, rule, state.loadedFrom)
-		//if err != nil {
-		//	return nil, err
-		//}
-		//if rule.Object != nil {
-		//	for keyX, ruleX := range *rule.Object {
-		//		_, err := validate(keyX, data.(map[string]interface{}), ruleX, fromJSONEncoder)
-		//		if err != nil {
-		//			//if rule.CustomMsg != nil #TODO: custom message for nested object
-		//			err = errors.New(fmt.Sprintf("error on object '%s' : '%s'", key, err))
-		//			return nil, err
-		//		}
-		//	}
-		//}
 		if data != nil {
 			filledFields = append(filledFields, key)
 		} else {

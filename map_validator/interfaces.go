@@ -7,8 +7,7 @@ type validatorType interface {
 }
 
 type setRoleOperationType interface {
-	SetRules(validations map[string]Rules) *dataState
-	StrictKeys() *ruleState
+	SetRules(validations RulesWrapper) *dataState
 	AddExtension(extension ExtensionType) *ruleState
 }
 
@@ -30,7 +29,7 @@ type ExtraOperationType interface {
 }
 
 type ExtensionType interface {
-	SetRoles(rules *map[string]Rules)
+	SetRoles(rules RulesWrapper)
 	BeforeLoad(data interface{}) error
 	AfterLoad(data *map[string]interface{}) error
 	BeforeValidation(data *map[string]interface{}) error

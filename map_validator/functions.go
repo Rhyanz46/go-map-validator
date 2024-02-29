@@ -88,15 +88,27 @@ func buildMessage(msg string, meta MessageMeta) error {
 	return errors.New(msg)
 }
 
-func validateRecursive(key string, data map[string]interface{}, rule Rules, loadedFrom loadFromType) (interface{}, error) {
+func validateRecursive(wrapper *RulesWrapper, key string, data map[string]interface{}, rule Rules, loadedFrom loadFromType) (interface{}, error) {
+	if wrapper != nil && wrapper.Setting.Strict {
+		var allowedKeys []string
+		keys := getAllKeys(data)
+		for XKey, _ := range wrapper.Rules {
+			allowedKeys = append(allowedKeys, XKey)
+		}
+		for _, XKey := range keys {
+			if !isDataInList(XKey, allowedKeys) {
+				return nil, errors.New(fmt.Sprintf("'%s' is not allowed key", XKey))
+			}
+		}
+	}
 	res, err := validate(key, data, rule, loadedFrom)
 	if err != nil {
 		return nil, err
 	}
 
 	if rule.Object != nil && res != nil {
-		for keyX, ruleX := range *rule.Object {
-			_, err = validateRecursive(keyX, res.(map[string]interface{}), ruleX, fromJSONEncoder)
+		for keyX, ruleX := range rule.Object.Rules {
+			_, err = validateRecursive(rule.Object, keyX, res.(map[string]interface{}), ruleX, fromJSONEncoder)
 			if err != nil {
 				//if rule.CustomMsg != nil #TODO: custom message for nested object
 				return nil, err
@@ -109,8 +121,8 @@ func validateRecursive(key string, data map[string]interface{}, rule Rules, load
 	if rule.ListObject != nil && res != nil {
 		listRes := res.([]interface{})
 		for _, xRes := range listRes {
-			for keyX, ruleX := range *rule.ListObject {
-				_, err = validateRecursive(keyX, xRes.(map[string]interface{}), ruleX, fromJSONEncoder)
+			for keyX, ruleX := range rule.ListObject.Rules {
+				_, err = validateRecursive(rule.Object, keyX, xRes.(map[string]interface{}), ruleX, fromJSONEncoder)
 				if err != nil {
 					return nil, err
 				}

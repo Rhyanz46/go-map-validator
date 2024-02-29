@@ -8,9 +8,11 @@ import (
 
 func TestExtension(t *testing.T) {
 	payload := map[string]interface{}{"hp": "+62567888", "email": "dev@ariansaputra.com"}
-	validRole := map[string]map_validator.Rules{
-		"hp":    {RegexString: `^\+(?:\d{2}[- ]?\d{6}|\d{11})$`},
-		"email": {RegexString: `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`},
+	validRole := map_validator.RulesWrapper{
+		Rules: map[string]map_validator.Rules{
+			"hp":    {RegexString: `^\+(?:\d{2}[- ]?\d{6}|\d{11})$`},
+			"email": {RegexString: `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`},
+		},
 	}
 	swaggerExt := example_extensions.ManipulatorExt().ResetAfterValidation()
 
@@ -33,9 +35,11 @@ func TestExtension(t *testing.T) {
 
 func TestInvalidExtension(t *testing.T) {
 	payload := map[string]interface{}{"hp": "+62567888", "email": "dev@ariansaputra.com"}
-	validRole := map[string]map_validator.Rules{
-		"hp":    {RegexString: `^\+(?:\d{2}[- ]?\d{6}|\d{11})$`},
-		"email": {RegexString: `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`},
+	validRole := map_validator.RulesWrapper{
+		Rules: map[string]map_validator.Rules{
+			"hp":    {RegexString: `^\+(?:\d{2}[- ]?\d{6}|\d{11})$`},
+			"email": {RegexString: `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`},
+		},
 	}
 	swaggerExt := example_extensions.ManipulatorExt()
 
