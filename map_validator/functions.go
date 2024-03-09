@@ -106,6 +106,29 @@ func validateRecursive(wrapper *RulesWrapper, key string, data map[string]interf
 		return nil, err
 	}
 
+	if res != nil && len(rule.Unique) > 0 {
+		for _, unique := range rule.Unique {
+			newUniqueValues := make(map[string]map[string]interface{})
+			if wrapper.uniqueValues == nil {
+				wrapper.uniqueValues = &newUniqueValues
+			} else {
+				newUniqueValues = *wrapper.uniqueValues
+			}
+			for keyX, val := range newUniqueValues[unique] {
+				if val == res {
+					return nil, errors.New(fmt.Sprintf("value of '%s' and '%s' fields must be different", keyX, key))
+				}
+			}
+			if newUniqueValues[unique] != nil {
+				newUniqueValues[unique][key] = res
+			} else {
+				newUniqueValues[unique] = map[string]interface{}{key: res}
+			}
+			wrapper.uniqueValues = &newUniqueValues
+		}
+	}
+
+	// if list
 	if rule.Object != nil && res != nil {
 		for keyX, ruleX := range rule.Object.Rules {
 			_, err = validateRecursive(rule.Object, keyX, res.(map[string]interface{}), ruleX, fromJSONEncoder)
@@ -118,6 +141,7 @@ func validateRecursive(wrapper *RulesWrapper, key string, data map[string]interf
 		}
 	}
 
+	// if object
 	if rule.ListObject != nil && res != nil {
 		listRes := res.([]interface{})
 		for _, xRes := range listRes {
