@@ -89,6 +89,7 @@ func buildMessage(msg string, meta MessageMeta) error {
 }
 
 func validateRecursive(wrapper *RulesWrapper, key string, data map[string]interface{}, rule Rules, loadedFrom loadFromType) (interface{}, error) {
+	var endOfLoop bool
 	if wrapper != nil && wrapper.Setting.Strict {
 		var allowedKeys []string
 		keys := getAllKeys(data)
@@ -101,30 +102,77 @@ func validateRecursive(wrapper *RulesWrapper, key string, data map[string]interf
 			}
 		}
 	}
+
 	res, err := validate(key, data, rule, loadedFrom)
 	if err != nil {
 		return nil, err
 	}
 
-	if res != nil && len(rule.Unique) > 0 {
+	// check unique values
+	if wrapper != nil && res != nil && len(rule.Unique) > 0 {
 		for _, unique := range rule.Unique {
-			newUniqueValues := make(map[string]map[string]interface{})
 			if wrapper.uniqueValues == nil {
-				wrapper.uniqueValues = &newUniqueValues
-			} else {
-				newUniqueValues = *wrapper.uniqueValues
+				wrapper.uniqueValues = &map[string]map[string]interface{}{}
 			}
-			for keyX, val := range newUniqueValues[unique] {
+
+			if _, exists := (*wrapper.uniqueValues)[unique]; !exists {
+				(*wrapper.uniqueValues)[unique] = make(map[string]interface{})
+			}
+
+			for keyX, val := range (*wrapper.uniqueValues)[unique] {
 				if val == res {
-					return nil, errors.New(fmt.Sprintf("value of '%s' and '%s' fields must be different", keyX, key))
+					return nil, fmt.Errorf("value of '%s' and '%s' fields must be different", keyX, key)
 				}
 			}
-			if newUniqueValues[unique] != nil {
-				newUniqueValues[unique][key] = res
-			} else {
-				newUniqueValues[unique] = map[string]interface{}{key: res}
+			(*wrapper.uniqueValues)[unique][key] = res
+		}
+	}
+
+	// put filled and null fields
+	if wrapper != nil {
+		if wrapper.filledField == nil {
+			wrapper.filledField = &[]string{}
+		}
+		if wrapper.nullFields == nil {
+			wrapper.nullFields = &[]string{}
+		}
+
+		if res != nil {
+			*wrapper.filledField = append(*wrapper.filledField, key)
+		} else {
+			*wrapper.nullFields = append(*wrapper.nullFields, key)
+		}
+
+		if len(wrapper.Rules) == len(*wrapper.nullFields)+len(*wrapper.filledField) {
+			endOfLoop = true
+		}
+	}
+
+	// put required without values
+	if wrapper != nil && len(rule.RequiredWithout) > 0 {
+		for _, unique := range rule.RequiredWithout {
+			if wrapper.requiredWithout == nil {
+				wrapper.requiredWithout = &map[string][]string{}
 			}
-			wrapper.uniqueValues = &newUniqueValues
+
+			if _, exists := (*wrapper.requiredWithout)[unique]; !exists {
+				(*wrapper.requiredWithout)[unique] = []string{}
+			}
+			(*wrapper.requiredWithout)[unique] = append((*wrapper.requiredWithout)[unique], key)
+		}
+	}
+
+	if endOfLoop && wrapper.requiredWithout != nil {
+		for _, field := range *wrapper.nullFields {
+			dependenciesField := (*wrapper.requiredWithout)[field]
+			if len(dependenciesField) == 0 {
+				continue
+			}
+			for _, XField := range dependenciesField {
+				if isDataInList(XField, *wrapper.nullFields) {
+					return nil, errors.New(fmt.Sprintf("if field '%s' is null you need to put value in this %v field", field, dependenciesField))
+				}
+			}
 		}
 	}
 
@@ -133,11 +181,8 @@ func validateRecursive(wrapper *RulesWrapper, key string, data map[string]interf
 		for keyX, ruleX := range rule.Object.Rules {
 			_, err = validateRecursive(rule.Object, keyX, res.(map[string]interface{}), ruleX, fromJSONEncoder)
 			if err != nil {
-				//if rule.CustomMsg != nil #TODO: custom message for nested object
 				return nil, err
 			}
-			//filledFields = append(filledFields, newFilledFields...) #TODO: get children fields fill or not filled
-			//nullFields = append(nullFields, newNullFields...)
 		}
 	}
 
@@ -162,6 +207,10 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	data := dataTemp[field]
 	var sliceData []interface{}
 	//var isListObject bool
+
+	if len(validator.RequiredWithout) > 0 {
+		validator.Null = true
+	}
 
 	// null validation
 	if !validator.Null && data == nil {
