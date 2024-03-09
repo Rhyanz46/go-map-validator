@@ -59,3 +59,35 @@ func TestChildRequiredWithout(t *testing.T) {
 		t.Errorf("Expected error with text at least %s, but we got %s", expected, err)
 	}
 }
+
+func TestClearChildRequiredWithout(t *testing.T) {
+	role := map_validator.RulesWrapper{
+		Rules: map[string]map_validator.Rules{
+			"data": {Object: &map_validator.RulesWrapper{
+				Rules: map[string]map_validator.Rules{
+					"name":          {Type: reflect.String},
+					"expired":       {Type: reflect.String, Null: true},
+					"flavor":        {Type: reflect.String, RequiredWithout: []string{"custom_flavor", "size"}},
+					"custom_flavor": {Type: reflect.String, RequiredWithout: []string{"flavor", "size"}},
+					"size":          {Type: reflect.Int, RequiredWithout: []string{"flavor", "custom_flavor"}},
+				},
+			}},
+		},
+	}
+	payload := map[string]interface{}{
+		"data": map[string]interface{}{
+			"name": "sabalong",
+			"size": 63,
+		},
+	}
+	check, err := map_validator.NewValidateBuilder().SetRules(role).Load(payload)
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+		return
+	}
+	_, err = check.RunValidate()
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+		return
+	}
+}
