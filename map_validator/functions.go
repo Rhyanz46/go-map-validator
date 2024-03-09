@@ -164,14 +164,18 @@ func validateRecursive(wrapper *RulesWrapper, key string, data map[string]interf
 
 	if endOfLoop && wrapper.requiredWithout != nil {
 		for _, field := range *wrapper.nullFields {
+			var required bool
 			dependenciesField := (*wrapper.requiredWithout)[field]
 			if len(dependenciesField) == 0 {
 				continue
 			}
 			for _, XField := range dependenciesField {
-				if isDataInList(XField, *wrapper.nullFields) {
-					return nil, errors.New(fmt.Sprintf("if field '%s' is null you need to put value in this %v field", field, dependenciesField))
+				if isDataInList(XField, *wrapper.filledField) {
+					required = true
 				}
+			}
+			if !required {
+				return nil, errors.New(fmt.Sprintf("if field '%s' is null you need to put value in this %v field", field, dependenciesField))
 			}
 		}
 	}
