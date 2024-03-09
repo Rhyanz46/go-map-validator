@@ -18,6 +18,8 @@ go get github.com/Rhyanz46/go-map-validator/map_validator
 - validate value in `map[string]interface{}` by keys
 - validate data from `http.Request` json/multipart
     - support file upload
+- Unique Value
+  - ex case : `old_password` and `new_password` cant be using same value
 - enum value check
 - min/max length data check
 - email field check
@@ -48,8 +50,6 @@ go get github.com/Rhyanz46/go-map-validator/map_validator
 
 ## Road Map
 
-- Unique Value 
-    - ex case : `old_password` and `new_password` cant be using same value
 - get from urls params http
 - validation for `base64`
 - handle file size on multipart
@@ -219,4 +219,29 @@ if err != nil {
     t.Errorf("Expected not have error, but got error : %s", err)
 }
 
+```
+
+
+### Example 7 ( Unique value )
+```go
+role := map_validator.RulesWrapper{
+    Rules: map[string]map_validator.Rules{
+        "password":     {Type: reflect.String, Unique: []string{"password"}, Null: true},
+        "new_password": {Type: reflect.String, Unique: []string{"password"}, Null: true},
+    },
+}
+payload := map[string]interface{}{
+    "password":     "sabalong",
+    "new_password": "sabalong",
+}
+check, err := map_validator.NewValidateBuilder().SetRules(role).Load(payload)
+if err != nil {
+    t.Errorf("Expected not have error, but got error : %s", err)
+    return
+}
+expected := "value of 'password' and 'new_password' fields must be different"
+_, err = check.RunValidate()
+if err.Error() != expected {
+    t.Errorf("Expected :%s. But you got : %s", expected, err)
+}
 ```

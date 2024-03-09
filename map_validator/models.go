@@ -30,8 +30,9 @@ type Setting struct {
 }
 
 type RulesWrapper struct {
-	Rules   map[string]Rules
-	Setting Setting
+	Rules        map[string]Rules
+	Setting      Setting
+	uniqueValues *map[string]map[string]interface{}
 }
 
 type Rules struct {
@@ -51,6 +52,7 @@ type Rules struct {
 	IPv4OptionalPrefix bool
 	File               bool
 	RegexString        string
+	Unique             []string
 	Object             *RulesWrapper
 	ListObject         *RulesWrapper
 
