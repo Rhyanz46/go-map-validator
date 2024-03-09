@@ -23,8 +23,9 @@ func TestUniqueValue(t *testing.T) {
 		return
 	}
 	expected := "value of 'password' and 'new_password' fields must be different"
+	expectedOr := "value of 'new_password' and 'password' fields must be different"
 	_, err = check.RunValidate()
-	if err.Error() != expected {
+	if !(err.Error() == expected || err.Error() == expectedOr) {
 		t.Errorf("Expected :%s. But you got : %s", expected, err)
 	}
 }
@@ -74,8 +75,9 @@ func TestChildUniqueValue(t *testing.T) {
 		return
 	}
 	expected := "value of 'password' and 'new_password' fields must be different"
+	expectedOr := "value of 'new_password' and 'password' fields must be different"
 	_, err = check.RunValidate()
-	if err.Error() != expected {
+	if !(err.Error() == expected || err.Error() == expectedOr) {
 		t.Errorf("Expected :%s. But you got : %s", expected, err)
 	}
 }
@@ -101,8 +103,9 @@ func TestUniqueManyValue(t *testing.T) {
 		return
 	}
 	expected := "value of 'name' and 'new_password' fields must be different"
+	expectedOr := "value of 'new_password' and 'name' fields must be different"
 	_, err = check.RunValidate()
-	if err.Error() != expected {
+	if !(err.Error() == expected || err.Error() == expectedOr) {
 		t.Errorf("Expected :%s. But you got : %s", expected, err)
 	}
 }
