@@ -20,6 +20,8 @@ go get github.com/Rhyanz46/go-map-validator/map_validator
     - support file upload
 - Unique Value
   - ex case : `old_password` and `new_password` cant be using same value
+- RequiredWithout check
+  - ex case : the field `flavor` is required if `custom_flavor` is null
 - enum value check
 - min/max length data check
 - email field check
@@ -36,6 +38,7 @@ go get github.com/Rhyanz46/go-map-validator/map_validator
     - on unique values error : ⌛ not ready
     - on max data message : ⌛ not ready
     - on enum value not match : ⌛ not ready
+    - on `RequiredWithout` error : ⌛ not ready
 
 ## On Progress
 

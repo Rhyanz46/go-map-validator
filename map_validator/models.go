@@ -30,17 +30,20 @@ type Setting struct {
 }
 
 type RulesWrapper struct {
-	Rules        map[string]Rules
-	Setting      Setting
-	uniqueValues *map[string]map[string]interface{}
+	Rules           map[string]Rules
+	Setting         Setting
+	uniqueValues    *map[string]map[string]interface{}
+	filledField     *[]string
+	nullFields      *[]string
+	requiredWithout *map[string][]string
 }
 
 type Rules struct {
 	Null               bool
 	NilIfNull          bool
-	IsMapInterface     bool
+	AnonymousObject    bool
 	Email              bool
-	Enum               *EnumField[any] // new 🔥🔥🔥
+	Enum               *EnumField[any]
 	Type               reflect.Kind
 	Max                *int
 	Min                *int
@@ -53,6 +56,7 @@ type Rules struct {
 	File               bool
 	RegexString        string
 	Unique             []string
+	RequiredWithout    []string
 	Object             *RulesWrapper
 	ListObject         *RulesWrapper
 

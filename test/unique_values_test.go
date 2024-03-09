@@ -57,6 +57,7 @@ func TestChildUniqueValue(t *testing.T) {
 		Rules: map[string]map_validator.Rules{
 			"data": {Object: &map_validator.RulesWrapper{
 				Rules: map[string]map_validator.Rules{
+					"name":         {Type: reflect.String, Null: true},
 					"password":     {Type: reflect.String, Unique: []string{"password"}, Null: true},
 					"new_password": {Type: reflect.String, Unique: []string{"password"}, Null: true},
 				},
