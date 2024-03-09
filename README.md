@@ -30,11 +30,12 @@ go get github.com/Rhyanz46/go-map-validator/map_validator
 - nested validation 🔥
 - you can create your own extension 🔥🔥🔥🔥 (example : [https://github.com/Rhyanz46/go-map-validator/example_extensions/](https://github.com/Rhyanz46/go-map-validator/tree/main/example_extensions))
 - custom message :
-    - on invalid regex message : ✅
-    - on type not match message : ✅
-    - on null data message : ❌
-    - on max data message : ❌
-    - on enum value not match : ❌
+    - on invalid regex message : ✅ ready
+    - on type not match message : ✅ ready
+    - on null data message : ⌛ not ready
+    - on unique values error : ⌛ not ready
+    - on max data message : ⌛ not ready
+    - on enum value not match : ⌛ not ready
 
 ## On Progress
 
