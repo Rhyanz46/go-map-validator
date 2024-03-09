@@ -38,9 +38,9 @@ type RulesWrapper struct {
 type Rules struct {
 	Null               bool
 	NilIfNull          bool
-	IsMapInterface     bool
+	AnonymousObject    bool
 	Email              bool
-	Enum               *EnumField[any] // new 🔥🔥🔥
+	Enum               *EnumField[any]
 	Type               reflect.Kind
 	Max                *int
 	Min                *int

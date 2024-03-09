@@ -179,7 +179,7 @@ func TestInterfaceFieldBinding(t *testing.T) {
 			"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
 			"hoby":          {Type: reflect.String, Null: true},
 			"menikah":       {Type: reflect.Bool, Null: false},
-			"list_data":     {IsMapInterface: true},
+			"list_data":     {AnonymousObject: true},
 		},
 	}
 

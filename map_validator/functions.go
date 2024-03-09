@@ -195,7 +195,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 		validator.Enum == nil &&
 		validator.Object == nil &&
 		validator.ListObject == nil &&
-		!validator.IsMapInterface &&
+		!validator.AnonymousObject &&
 		!validator.File &&
 		!validator.IPV4Network &&
 		validator.RegexString == "")
@@ -392,7 +392,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 		data = sliceDataX
 	}
 
-	if validator.IsMapInterface || validator.Object != nil {
+	if validator.AnonymousObject || validator.Object != nil {
 		res, err := toMapStringInterface(data)
 		if err != nil {
 			return nil, errors.New("field '" + field + "' is not valid object")
