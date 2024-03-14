@@ -34,9 +34,9 @@ go get github.com/Rhyanz46/go-map-validator/map_validator
 - custom message :
     - on invalid regex message : ✅ ready
     - on type not match message : ✅ ready
+    - on min/max data message : ✅ ready
     - on null data message : ⌛ not ready
     - on unique values error : ⌛ not ready
-    - on max data message : ⌛ not ready
     - on enum value not match : ⌛ not ready
     - on `RequiredWithout` error : ⌛ not ready
 
@@ -46,11 +46,15 @@ go get github.com/Rhyanz46/go-map-validator/map_validator
 
 ## Custom Message Variables
 
-| No |   Variable Name    |
-|:--:|:------------------:| 
-| 1  |     `${field}`     |
-| 2  | `${expected_type}` |
-| 3  |  `${actual_type}`  |
+| No |      Variable Name       |
+|:--:|:------------------------:| 
+| 1  |        `${field}`        |
+| 2  |    `${expected_type}`    |
+| 3  |     `${actual_type}`     |
+| 4  |    `${actual_length}`    |
+| 5  | `${expected_min_length}` |
+| 6  | `${expected_max_length}` |
+
 
 ## Road Map
 
