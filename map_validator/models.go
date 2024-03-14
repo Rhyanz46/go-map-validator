@@ -6,9 +6,12 @@ import (
 )
 
 type MessageMeta struct {
-	Field        *string
-	ExpectedType *reflect.Kind
-	ActualType   *reflect.Kind
+	Field             *string
+	ExpectedType      *reflect.Kind
+	ActualLength      *int
+	ExpectedMinLength *int
+	ExpectedMaxLength *int
+	ActualType        *reflect.Kind
 }
 
 type EnumField[T any] struct {
@@ -20,8 +23,8 @@ type CustomMsg struct {
 	OnTypeNotMatch *string
 	//OnEnumValueNotMatch *string
 	//OnNull              *string
-	//OnMax               *string
-	//OnMin               *string
+	OnMax         *string
+	OnMin         *string
 	OnRegexString *string
 }
 

@@ -115,3 +115,40 @@ func TestValidTypeNotMatchMessage(t *testing.T) {
 		t.Errorf("Expected not have error, but got error : %s", err)
 	}
 }
+
+func TestInvalidLengthMessage(t *testing.T) {
+	payload := map[string]interface{}{"total": 1, "unit": "KG"}
+	validRole := map_validator.RulesWrapper{
+		Rules: map[string]map_validator.Rules{
+			"total": {
+				Type: reflect.Int,
+				Max:  map_validator.SetTotal(3),
+				Min:  map_validator.SetTotal(2),
+				CustomMsg: map_validator.CustomMsg{
+					OnMin: map_validator.SetMessage("The min size allowed is ${expected_min_length}., but your input is ${actual_length}"),
+					OnMax: map_validator.SetMessage("The max size allowed is ${expected_max_length}., but your input is ${actual_length}"),
+				},
+			},
+		},
+	}
+	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+	}
+	expected := "The min size allowed is 2., but your input is 1"
+	_, err = check.RunValidate()
+	if err.Error() != expected {
+		t.Errorf("Expected %s, but got error : %s", expected, err)
+	}
+
+	payload = map[string]interface{}{"total": 12, "unit": "KG"}
+	check, err = map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+	}
+	expected = "The max size allowed is 3., but your input is 12"
+	_, err = check.RunValidate()
+	if err.Error() != expected {
+		t.Errorf("Expected %s, but got error : %s", expected, err)
+	}
+}

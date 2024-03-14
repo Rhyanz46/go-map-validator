@@ -67,6 +67,9 @@ func buildMessage(msg string, meta MessageMeta) error {
 	fieldVar := "${field}"
 	expectedTypeVar := "${expected_type}"
 	actualTypeVar := "${actual_type}"
+	actualLengthVar := "${actual_length}"
+	expectedMinLengthVar := "${expected_min_length}"
+	expectedMaxLengthVar := "${expected_max_length}"
 	if strings.Contains(msg, fieldVar) {
 		if meta.Field != nil {
 			v := *meta.Field
@@ -83,6 +86,24 @@ func buildMessage(msg string, meta MessageMeta) error {
 		if meta.ActualType != nil {
 			v := *meta.ActualType
 			msg = strings.ReplaceAll(msg, actualTypeVar, v.String())
+		}
+	}
+	if strings.Contains(msg, actualLengthVar) {
+		if meta.ActualLength != nil {
+			v := *meta.ActualLength
+			msg = strings.ReplaceAll(msg, actualLengthVar, fmt.Sprintf("%v", v))
+		}
+	}
+	if strings.Contains(msg, expectedMinLengthVar) {
+		if meta.ExpectedMinLength != nil {
+			v := *meta.ExpectedMinLength
+			msg = strings.ReplaceAll(msg, expectedMinLengthVar, fmt.Sprintf("%v", v))
+		}
+	}
+	if strings.Contains(msg, expectedMaxLengthVar) {
+		if meta.ExpectedMaxLength != nil {
+			v := *meta.ExpectedMaxLength
+			msg = strings.ReplaceAll(msg, expectedMaxLengthVar, fmt.Sprintf("%v", v))
 		}
 	}
 	return errors.New(msg)
@@ -454,46 +475,70 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	}
 
 	if validator.Min != nil && data != nil {
+		var isErr bool
+		var actualLength int
+		err := errors.New(fmt.Sprintf("the field '%s' should be or greater than %v", field, *validator.Min))
 		if reflect.String == dataType {
 			if total := utf8.RuneCountInString(data.(string)); total < *validator.Min {
-				return nil, errors.New(
-					fmt.Sprintf("the field '%s' should be or greater than %v character", field, *validator.Min),
-				)
+				isErr = true
+				actualLength = total
 			}
-		} else if reflect.Float64 == dataType {
-			if int(data.(float64)) < *validator.Min {
-				return nil, errors.New(
-					fmt.Sprintf("the field '%s' should be or greater than %v", field, *validator.Min),
-				)
+		} else if isIntegerFamily(dataType) {
+			val, _ := strconv.Atoi(fmt.Sprintf("%v", data))
+			if val < *validator.Min {
+				isErr = true
+				actualLength = val
 			}
 		} else if reflect.Slice == dataType {
 			if len(sliceData) < *validator.Min {
-				return nil, errors.New(
-					fmt.Sprintf("the field '%s' should be or greater than %v", field, *validator.Min),
-				)
+				isErr = true
+				actualLength = len(sliceData)
 			}
+		}
+
+		if isErr {
+			if validator.CustomMsg.OnMin != nil {
+				return nil, buildMessage(*validator.CustomMsg.OnMin, MessageMeta{
+					Field:             &field,
+					ExpectedMinLength: SetTotal(*validator.Min),
+					ActualLength:      SetTotal(actualLength),
+				})
+			}
+			return nil, err
 		}
 	}
 
 	if validator.Max != nil && data != nil {
+		var isErr bool
+		var actualLength int
+		err := errors.New(fmt.Sprintf("the field '%s' should be or lower than %v", field, *validator.Max))
 		if reflect.String == dataType {
 			if total := utf8.RuneCountInString(data.(string)); total > *validator.Max {
-				return nil, errors.New(
-					fmt.Sprintf("the field '%s' should be or lower than %v character", field, *validator.Max),
-				)
+				isErr = true
+				actualLength = total
 			}
-		} else if reflect.Float64 == dataType {
-			if int(data.(float64)) > *validator.Max {
-				return nil, errors.New(
-					fmt.Sprintf("the field '%s' should be or lower than %v", field, *validator.Max),
-				)
+		} else if isIntegerFamily(dataType) {
+			val, _ := strconv.Atoi(fmt.Sprintf("%v", data))
+			if val > *validator.Max {
+				isErr = true
+				actualLength = val
 			}
 		} else if reflect.Slice == dataType {
 			if len(sliceData) > *validator.Max {
-				return nil, errors.New(
-					fmt.Sprintf("the field '%s' should be or lower than %v", field, *validator.Max),
-				)
+				isErr = true
+				actualLength = len(sliceData)
 			}
+		}
+
+		if isErr {
+			if validator.CustomMsg.OnMax != nil {
+				return nil, buildMessage(*validator.CustomMsg.OnMax, MessageMeta{
+					Field:             &field,
+					ExpectedMaxLength: SetTotal(*validator.Max),
+					ActualLength:      SetTotal(actualLength),
+				})
+			}
+			return nil, err
 		}
 	}
 
@@ -538,6 +583,20 @@ func toMapStringInterface(data interface{}) (map[string]interface{}, error) {
 		return nil, err
 	}
 	return res, nil
+}
+
+func extractInteger(data string) int {
+	var intStr string
+	re := regexp.MustCompile("[0-9]+")
+	resStr := re.FindAllString(data, -1)
+	for _, val := range resStr {
+		intStr += val
+	}
+	res, err := strconv.Atoi(intStr)
+	if err != nil {
+		return 0
+	}
+	return res
 }
 
 func convertValue(newValue interface{}, kind reflect.Kind, data reflect.Value, pointer bool) error {
