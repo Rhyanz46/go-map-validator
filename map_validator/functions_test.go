@@ -99,7 +99,7 @@ func TestValidateStringMaxLength(t *testing.T) {
 		t.Errorf("Expected error, but got none")
 	}
 
-	expectedError := "the field 'field1' should be or lower than 5 character"
+	expectedError := "the field 'field1' should be or lower than 5"
 	if err != nil && err.Error() != expectedError {
 		t.Errorf("Expected error: %s, got: %v", expectedError, err)
 	}
@@ -121,7 +121,7 @@ func TestValidateStringMinLength(t *testing.T) {
 		t.Errorf("Expected error, but got none")
 	}
 
-	expectedError := "the field 'field1' should be or greater than 5 character"
+	expectedError := "the field 'field1' should be or greater than 5"
 	if err != nil && err.Error() != expectedError {
 		t.Errorf("Expected error: %s, got: %v", expectedError, err)
 	}
