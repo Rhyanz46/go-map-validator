@@ -152,3 +152,45 @@ func TestInvalidLengthMessage(t *testing.T) {
 		t.Errorf("Expected %s, but got error : %s", expected, err)
 	}
 }
+
+func TestInvalidLengthMessageCaseOne(t *testing.T) {
+	validRole := map_validator.NewValidateBuilder().SetRules(map_validator.RulesWrapper{
+		Rules: map[string]map_validator.Rules{
+			"project_id": {UUID: true},
+			"flavor":     {UUID: true, RequiredWithout: []string{"custom_flavor"}},
+			"custom_flavor": {RequiredWithout: []string{"flavor"}, Object: &map_validator.RulesWrapper{Rules: map[string]map_validator.Rules{
+				"size": {
+					Type: reflect.Float64,
+					Min:  map_validator.SetTotal(25),
+					Max:  map_validator.SetTotal(9999999),
+					CustomMsg: map_validator.CustomMsg{
+						OnMin: map_validator.SetMessage("The minimum size allowed is 25 GB."),
+					},
+				},
+			}}},
+			"name":           {Type: reflect.String, Max: map_validator.SetTotal(255)},
+			"description":    {Type: reflect.String, Max: map_validator.SetTotal(500), Null: true},
+			"network_subnet": {IPV4Network: true, RequiredWithout: []string{"vpc"}},
+			"vpc":            {Type: reflect.String, Max: map_validator.SetTotal(255), RequiredWithout: []string{"network_subnet"}},
+			"zone":           {Type: reflect.String, Max: map_validator.SetTotal(255)},
+			"path":           {Type: reflect.String, Max: map_validator.SetTotal(500)},
+		},
+		Setting: map_validator.Setting{Strict: true},
+	})
+	check, err := validRole.Load(map[string]interface{}{
+		"custom_flavor": map[string]interface{}{"size": 99999991},
+		"zone":          "arjuna",
+		"path":          "/aaa/aad",
+		"name":          "121",
+		"project_id":    "647d4b1b-b36b-4c6e-85b5-f4cabc7a8a78",
+		"vpc":           "12.1.2.3",
+	})
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+	}
+	expected := "the field 'size' should be or lower than 9999999"
+	_, err = check.RunValidate()
+	if err.Error() != expected {
+		t.Errorf("Expected %s, but got error : %s", expected, err)
+	}
+}

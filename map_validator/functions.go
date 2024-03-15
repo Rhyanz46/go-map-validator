@@ -476,23 +476,25 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 
 	if validator.Min != nil && data != nil {
 		var isErr bool
-		var actualLength int
+		var actualLength int64
 		err := errors.New(fmt.Sprintf("the field '%s' should be or greater than %v", field, *validator.Min))
 		if reflect.String == dataType {
-			if total := utf8.RuneCountInString(data.(string)); total < *validator.Min {
+			if total := utf8.RuneCountInString(data.(string)); int64(total) < *validator.Min {
 				isErr = true
-				actualLength = total
+				actualLength = int64(total)
 			}
 		} else if isIntegerFamily(dataType) {
-			val, _ := strconv.Atoi(fmt.Sprintf("%v", data))
-			if val < *validator.Min {
+			strData := removeAfter(fmt.Sprintf("%v", data), "e+")
+			num := extractInteger(strData)
+			if num < *validator.Min {
 				isErr = true
-				actualLength = val
+				actualLength = num
 			}
 		} else if reflect.Slice == dataType {
-			if len(sliceData) < *validator.Min {
+			total := int64(len(sliceData))
+			if total < *validator.Min {
 				isErr = true
-				actualLength = len(sliceData)
+				actualLength = total
 			}
 		}
 
@@ -510,23 +512,25 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 
 	if validator.Max != nil && data != nil {
 		var isErr bool
-		var actualLength int
+		var actualLength int64
 		err := errors.New(fmt.Sprintf("the field '%s' should be or lower than %v", field, *validator.Max))
 		if reflect.String == dataType {
-			if total := utf8.RuneCountInString(data.(string)); total > *validator.Max {
+			if total := utf8.RuneCountInString(data.(string)); int64(total) > *validator.Max {
 				isErr = true
-				actualLength = total
+				actualLength = int64(total)
 			}
 		} else if isIntegerFamily(dataType) {
-			val, _ := strconv.Atoi(fmt.Sprintf("%v", data))
-			if val > *validator.Max {
+			strData := removeAfter(fmt.Sprintf("%v", data), "e+")
+			num := extractInteger(strData)
+			if num > *validator.Max {
 				isErr = true
-				actualLength = val
+				actualLength = num
 			}
 		} else if reflect.Slice == dataType {
-			if len(sliceData) > *validator.Max {
+			total := int64(len(sliceData))
+			if total > *validator.Max {
 				isErr = true
-				actualLength = len(sliceData)
+				actualLength = total
 			}
 		}
 
@@ -545,7 +549,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	return data, nil
 }
 
-func SetTotal(total int) *int {
+func SetTotal(total int64) *int64 {
 	return &total
 }
 
@@ -585,14 +589,22 @@ func toMapStringInterface(data interface{}) (map[string]interface{}, error) {
 	return res, nil
 }
 
-func extractInteger(data string) int {
+func removeAfter(data, after string) string {
+	split := strings.Split(data, after)
+	if len(split) > 0 {
+		return split[0]
+	}
+	return data
+}
+
+func extractInteger(data string) int64 {
 	var intStr string
 	re := regexp.MustCompile("[0-9]+")
 	resStr := re.FindAllString(data, -1)
 	for _, val := range resStr {
 		intStr += val
 	}
-	res, err := strconv.Atoi(intStr)
+	res, err := strconv.ParseInt(intStr, 10, 64)
 	if err != nil {
 		return 0
 	}

@@ -8,9 +8,9 @@ import (
 type MessageMeta struct {
 	Field             *string
 	ExpectedType      *reflect.Kind
-	ActualLength      *int
-	ExpectedMinLength *int
-	ExpectedMaxLength *int
+	ActualLength      *int64
+	ExpectedMinLength *int64
+	ExpectedMaxLength *int64
 	ActualType        *reflect.Kind
 }
 
@@ -48,8 +48,8 @@ type Rules struct {
 	Email              bool
 	Enum               *EnumField[any]
 	Type               reflect.Kind
-	Max                *int
-	Min                *int
+	Max                *int64
+	Min                *int64
 	IfNull             interface{}
 	UUID               bool
 	UUIDToString       bool
