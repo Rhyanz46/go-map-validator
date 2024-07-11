@@ -39,6 +39,7 @@ type RulesWrapper struct {
 	filledField     *[]string
 	nullFields      *[]string
 	requiredWithout *map[string][]string
+	requiredIf      *map[string][]string
 }
 
 type Rules struct {
@@ -60,6 +61,7 @@ type Rules struct {
 	RegexString        string
 	Unique             []string
 	RequiredWithout    []string
+	RequiredIf         []string
 	Object             *RulesWrapper
 	ListObject         *RulesWrapper
 
