@@ -196,7 +196,39 @@ func validateRecursive(wrapper *RulesWrapper, key string, data map[string]interf
 				}
 			}
 			if !required {
-				return nil, errors.New(fmt.Sprintf("if field '%s' is null you need to put value in this %v field", field, dependenciesField))
+				return nil, errors.New(fmt.Sprintf("if field '%s' is null you need to put value in %v field", field, dependenciesField))
+			}
+		}
+	}
+
+	// put required if values
+	if wrapper != nil && len(rule.RequiredIf) > 0 {
+		for _, unique := range rule.RequiredIf {
+			if wrapper.requiredIf == nil {
+				wrapper.requiredIf = &map[string][]string{}
+			}
+
+			if _, exists := (*wrapper.requiredIf)[unique]; !exists {
+				(*wrapper.requiredIf)[unique] = []string{}
+			}
+			(*wrapper.requiredIf)[unique] = append((*wrapper.requiredIf)[unique], key)
+		}
+	}
+
+	if endOfLoop && wrapper.requiredIf != nil {
+		for _, field := range *wrapper.filledField {
+			var required bool
+			dependenciesField := (*wrapper.requiredIf)[field]
+			if len(dependenciesField) == 0 {
+				continue
+			}
+			for _, XField := range dependenciesField {
+				if !isDataInList(XField, *wrapper.nullFields) {
+					required = true
+				}
+			}
+			if !required {
+				return nil, errors.New(fmt.Sprintf("if field '%s' is filled you need to put value in %v field also", field, dependenciesField))
 			}
 		}
 	}
@@ -233,7 +265,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	var sliceData []interface{}
 	//var isListObject bool
 
-	if len(validator.RequiredWithout) > 0 {
+	if len(validator.RequiredWithout) > 0 || len(validator.RequiredIf) > 0 {
 		validator.Null = true
 	}
 

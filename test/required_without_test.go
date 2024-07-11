@@ -22,7 +22,7 @@ func TestRequiredWithout(t *testing.T) {
 		return
 	}
 
-	expected := "is null you need to put value in this"
+	expected := "is null you need to put value in "
 	_, err = check.RunValidate()
 	if !strings.Contains(err.Error(), expected) {
 		t.Errorf("Expected error with text at least %s, but we got %s", expected, err)
@@ -53,9 +53,9 @@ func TestChildRequiredWithout(t *testing.T) {
 		t.Errorf("Expected not have error, but got error : %s", err)
 		return
 	}
-	expected := "is null you need to put value in this"
+	expected := "is null you need to put value in "
 	_, err = check.RunValidate()
-	if !strings.Contains(err.Error(), expected) {
+	if err == nil || !strings.Contains(err.Error(), expected) {
 		t.Errorf("Expected error with text at least %s, but we got %s", expected, err)
 	}
 }
