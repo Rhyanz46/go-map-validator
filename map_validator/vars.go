@@ -16,3 +16,7 @@ const (
 	fromMapString
 	fromJSONEncoder
 )
+
+const (
+	chainKey = "root"
+)

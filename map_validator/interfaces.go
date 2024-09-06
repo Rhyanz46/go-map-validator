@@ -36,3 +36,26 @@ type ExtensionType interface {
 	AfterValidation(data *map[string]interface{}) error
 	SetExtraData(data *ExtraOperationData) ExtensionType
 }
+
+type ChainResultType interface {
+	GetAllKeys() []string
+	PrintHierarchyWithSeparator(separator string, currentPath string)
+	ToMap() map[string]interface{}
+	RunManipulator() error
+}
+
+type ChainerType interface {
+	GetParentKey() string
+	Next(index int) ChainerType
+	Back() ChainerType
+	Forward(index int) ChainerType
+	SetKey(name string) ChainerType
+	GetKey() string
+	GetParentKeys() []string
+	AddChild() ChainerType
+	LoadFromMap(data map[string]interface{})
+	SetValue(value interface{}) ChainerType
+	GetValue() interface{}
+	SetManipulator(manipulator *func(interface{}) (interface{}, error)) ChainerType
+	GetResult() ChainResultType
+}

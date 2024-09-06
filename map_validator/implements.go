@@ -184,6 +184,7 @@ func (state *dataState) LoadFormHttp(r *http.Request) (*finalOperation, error) {
 }
 
 func (state *finalOperation) RunValidate() (*ExtraOperationData, error) {
+	initChain := newChainer().SetKey(chainKey)
 	if state == nil || state.data == nil {
 		return nil, errors.New("no data to Validate because last progress is error")
 	}
@@ -196,7 +197,7 @@ func (state *finalOperation) RunValidate() (*ExtraOperationData, error) {
 		}
 	}
 	for key, rule := range state.rules.Rules {
-		data, err := validateRecursive(state.rules, key, state.data, rule, state.loadedFrom)
+		data, err := validateRecursive(initChain, state.rules, key, state.data, rule, state.loadedFrom)
 		if err != nil {
 			return nil, err
 		}
@@ -206,15 +207,23 @@ func (state *finalOperation) RunValidate() (*ExtraOperationData, error) {
 			nullFields = append(nullFields, key)
 		}
 	}
+
+	chainRes := initChain.GetResult()
+	err := chainRes.RunManipulator()
+	if err != nil {
+		return nil, err
+	}
+
+	manipulatedData := chainRes.ToMap()
 	extraData := &ExtraOperationData{
 		rules:        state.rules,
 		loadedFrom:   &state.loadedFrom,
-		data:         &state.data,
+		data:         &manipulatedData,
 		filledFields: filledFields,
 		nullFields:   nullFields,
 	}
 	for _, ex := range state.extension {
-		err := ex.SetExtraData(extraData).AfterValidation(&state.data)
+		err := ex.SetExtraData(extraData).AfterValidation(&manipulatedData)
 		if err != nil {
 			return nil, err
 		}
