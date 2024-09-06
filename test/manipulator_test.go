@@ -31,8 +31,8 @@ func TestManipulate(t *testing.T) {
 			BuildRoles().
 			SetRule("name", map_validator.Rules{Type: reflect.String}).
 			SetRule("age", map_validator.Rules{Type: reflect.Int}).
-			SetManipulator("name", &trimAfterValidation)}).
-		SetManipulator("description", &trimAfterValidation).
+			SetManipulator("name", trimAfterValidation)}).
+		SetManipulator("description", trimAfterValidation).
 		Done()
 
 	xx, err := map_validator.NewValidateBuilder().SetRules(roles).Load(data)
@@ -65,7 +65,7 @@ func TestManipulateWithFullBuilderRoles(t *testing.T) {
 	roles := map_validator.BuildRoles().
 		SetRule("description", map_validator.Rules{Type: reflect.String}).
 		SetRule("note", map_validator.Rules{Type: reflect.String}).
-		SetManipulator("description", &trimAfterValidation).
+		SetManipulator("description", trimAfterValidation).
 		Done()
 
 	xx, err := map_validator.NewValidateBuilder().SetRules(roles).Load(data)

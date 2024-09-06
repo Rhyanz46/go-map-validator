@@ -12,8 +12,8 @@ func (rw *RulesWrapper) SetRule(field string, rule Rules) *RulesWrapper {
 	return rw
 }
 
-func (rw *RulesWrapper) SetManipulator(field string, fun *func(data interface{}) (result interface{}, err error)) *RulesWrapper {
-	rw.manipulator = append(rw.manipulator, manipulator{Field: field, Func: fun})
+func (rw *RulesWrapper) SetManipulator(field string, fun func(data interface{}) (result interface{}, err error)) *RulesWrapper {
+	rw.manipulator = append(rw.manipulator, manipulator{Field: field, Func: &fun})
 	return rw
 }
 
