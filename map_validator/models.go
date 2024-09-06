@@ -5,6 +5,11 @@ import (
 	"reflect"
 )
 
+type manipulator struct {
+	Field string
+	Func  *func(interface{}) (interface{}, error)
+}
+
 type MessageMeta struct {
 	Field             *string
 	ExpectedType      *reflect.Kind
@@ -40,6 +45,7 @@ type RulesWrapper struct {
 	nullFields      *[]string
 	requiredWithout *map[string][]string
 	requiredIf      *map[string][]string
+	manipulator     []manipulator
 }
 
 type Rules struct {

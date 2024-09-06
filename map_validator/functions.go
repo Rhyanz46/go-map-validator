@@ -109,7 +109,9 @@ func buildMessage(msg string, meta MessageMeta) error {
 	return errors.New(msg)
 }
 
-func validateRecursive(wrapper *RulesWrapper, key string, data map[string]interface{}, rule Rules, loadedFrom loadFromType) (interface{}, error) {
+func validateRecursive(pChain ChainerType, wrapper *RulesWrapper, key string, data map[string]interface{}, rule Rules, loadedFrom loadFromType) (interface{}, error) {
+	//child and parent chain
+	cChain := pChain.AddChild().SetKey(key)
 	var endOfLoop bool
 	if wrapper != nil && wrapper.Setting.Strict {
 		var allowedKeys []string
@@ -127,6 +129,10 @@ func validateRecursive(wrapper *RulesWrapper, key string, data map[string]interf
 	res, err := validate(key, data, rule, loadedFrom)
 	if err != nil {
 		return nil, err
+	}
+
+	if res != nil {
+		cChain.SetValue(res)
 	}
 
 	// check unique values
@@ -167,6 +173,12 @@ func validateRecursive(wrapper *RulesWrapper, key string, data map[string]interf
 		if len(wrapper.Rules) == len(*wrapper.nullFields)+len(*wrapper.filledField) {
 			endOfLoop = true
 		}
+
+		for _, mptr := range wrapper.manipulator {
+			if key == mptr.Field {
+				cChain.SetManipulator(mptr.Func)
+			}
+		}
 	}
 
 	// put required without values
@@ -183,7 +195,7 @@ func validateRecursive(wrapper *RulesWrapper, key string, data map[string]interf
 		}
 	}
 
-	if endOfLoop && wrapper.requiredWithout != nil {
+	if endOfLoop && wrapper != nil && wrapper.requiredWithout != nil {
 		for _, field := range *wrapper.nullFields {
 			var required bool
 			dependenciesField := (*wrapper.requiredWithout)[field]
@@ -215,7 +227,7 @@ func validateRecursive(wrapper *RulesWrapper, key string, data map[string]interf
 		}
 	}
 
-	if endOfLoop && wrapper.requiredIf != nil {
+	if endOfLoop && wrapper != nil && wrapper.requiredIf != nil {
 		for _, field := range *wrapper.filledField {
 			var required bool
 			dependenciesField := (*wrapper.requiredIf)[field]
@@ -236,7 +248,7 @@ func validateRecursive(wrapper *RulesWrapper, key string, data map[string]interf
 	// if list
 	if rule.Object != nil && res != nil {
 		for keyX, ruleX := range rule.Object.Rules {
-			_, err = validateRecursive(rule.Object, keyX, res.(map[string]interface{}), ruleX, fromJSONEncoder)
+			_, err = validateRecursive(cChain, rule.Object, keyX, res.(map[string]interface{}), ruleX, fromJSONEncoder)
 			if err != nil {
 				return nil, err
 			}
@@ -248,7 +260,7 @@ func validateRecursive(wrapper *RulesWrapper, key string, data map[string]interf
 		listRes := res.([]interface{})
 		for _, xRes := range listRes {
 			for keyX, ruleX := range rule.ListObject.Rules {
-				_, err = validateRecursive(rule.Object, keyX, xRes.(map[string]interface{}), ruleX, fromJSONEncoder)
+				_, err = validateRecursive(cChain, rule.Object, keyX, xRes.(map[string]interface{}), ruleX, fromJSONEncoder)
 				if err != nil {
 					return nil, err
 				}
