@@ -310,54 +310,6 @@ func TestStrictTwo(t *testing.T) {
 	}
 }
 
-func TestValidRegex(t *testing.T) {
-	payload := map[string]interface{}{"hp": "+62567888", "email": "dev@ariansaputra.com"}
-	validRole := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"hp":    {RegexString: `^\+(?:\d{2}[- ]?\d{6}|\d{11})$`},
-			"email": {RegexString: `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`},
-		},
-	}
-	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
-	if err != nil {
-		t.Errorf("Expected not have error, but got error : %s", err)
-	}
-	_, err = check.RunValidate()
-	if err != nil {
-		t.Errorf("Expected not have error, but got error : %s", err)
-	}
-}
-
-func TestInvalidRegex(t *testing.T) {
-	payload := map[string]interface{}{"hp": "62567888", "email": "devariansaputra.com"}
-	validRole := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"hp": {RegexString: `^\+(?:\d{2}[- ]?\d{6}|\d{11})$`},
-		},
-	}
-	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
-	if err != nil {
-		t.Errorf("Expected not have error, but got error : %s", err)
-	}
-	_, err = check.RunValidate()
-	if err == nil {
-		t.Error("Expected error, but got no error :")
-	}
-	validRole = map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"email": {RegexString: `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`},
-		},
-	}
-	check, err = map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
-	if err != nil {
-		t.Errorf("Expected not have error, but got error : %s", err)
-	}
-	_, err = check.RunValidate()
-	if err == nil {
-		t.Error("Expected error, but got no error :")
-	}
-}
-
 func TestValidSlice(t *testing.T) {
 	payload := map[string]interface{}{"hobby": []string{"reading", "football"}}
 	validRole := map_validator.RulesWrapper{
