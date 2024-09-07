@@ -78,3 +78,31 @@ func TestManipulateWithFullBuilderRoles(t *testing.T) {
 		t.Errorf("Expected description to be test arian   keren bgt kan mantap bukan, but got %s", data["description"])
 	}
 }
+
+func TestManipulateOnNullableField(t *testing.T) {
+	data := map[string]interface{}{
+		"note": "coba aja mungkin      bisa \t mantap",
+	}
+
+	trimAfterValidation := func(i interface{}) (result interface{}, e error) {
+		x := i.(string)
+		result = trimAndClean(x)
+		return
+	}
+
+	roles := map_validator.BuildRoles().
+		SetRule("description", map_validator.Rules{Type: reflect.String, Null: true}).
+		SetRule("note", map_validator.Rules{Type: reflect.String}).
+		SetManipulator("description", trimAfterValidation).
+		Done()
+
+	xx, err := map_validator.NewValidateBuilder().SetRules(roles).Load(data)
+	extraCheck, err := xx.RunValidate()
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+		return
+	}
+	if extraCheck.GetData()["description"] != nil {
+		t.Errorf("Expected description to be nil, but got %s", data["description"])
+	}
+}
