@@ -106,3 +106,37 @@ func TestManipulateOnNullableField(t *testing.T) {
 		t.Errorf("Expected description to be nil, but got %s", data["description"])
 	}
 }
+
+func TestManipulateOnMultiFields(t *testing.T) {
+	data := map[string]interface{}{
+		"name":        "arian\n king   saputra",
+		"description": "test arian   keren bgt kan \t\n\n mantap bukan",
+		"note":        "coba aja mungkin      bisa \t mantap",
+	}
+
+	trimAfterValidation := func(i interface{}) (result interface{}, e error) {
+		x := i.(string)
+		result = trimAndClean(x)
+		return
+	}
+
+	roles := map_validator.BuildRoles().
+		SetRule("name", map_validator.Rules{Type: reflect.String}).
+		SetRule("description", map_validator.Rules{Type: reflect.String}).
+		SetRule("note", map_validator.Rules{Type: reflect.String}).
+		SetFieldsManipulator([]string{"description", "name"}, trimAfterValidation).
+		Done()
+
+	xx, err := map_validator.NewValidateBuilder().SetRules(roles).Load(data)
+	extraCheck, err := xx.RunValidate()
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+		return
+	}
+	if extraCheck.GetData()["name"] != "arian king saputra" {
+		t.Errorf("Expected name to be arian king saputra, but got %s", extraCheck.GetData()["name"])
+	}
+	if extraCheck.GetData()["description"] != "test arian keren bgt kan mantap bukan" {
+		t.Errorf("Expected description to be test arian   keren bgt kan mantap bukan, but got %s", extraCheck.GetData()["description"])
+	}
+}
