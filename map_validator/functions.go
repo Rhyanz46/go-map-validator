@@ -349,7 +349,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 			}
 			return nil, errors.New("the field '" + field + "' should be string")
 		}
-		regex, err := doSafeRegexpMustCompile(validator.RegexString)
+		regex, err := regexp.Compile(validator.RegexString)
 		if err != nil {
 			return nil, err
 		}
