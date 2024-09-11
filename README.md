@@ -54,6 +54,8 @@ go get github.com/Rhyanz46/go-map-validator/map_validator
 | 4  |    `${actual_length}`    |
 | 5  | `${expected_min_length}` |
 | 6  | `${expected_max_length}` |
+| 7  |    `${unique_origin}`    |
+| 8  |    `${unique_target}`    |
 
 
 ## Road Map
