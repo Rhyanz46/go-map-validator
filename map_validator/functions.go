@@ -70,6 +70,8 @@ func buildMessage(msg string, meta MessageMeta) error {
 	actualLengthVar := "${actual_length}"
 	expectedMinLengthVar := "${expected_min_length}"
 	expectedMaxLengthVar := "${expected_max_length}"
+	uniqueOriginVar := "${unique_origin}"
+	uniqueTargetVar := "${unique_target}"
 	if strings.Contains(msg, fieldVar) {
 		if meta.Field != nil {
 			v := *meta.Field
@@ -106,6 +108,18 @@ func buildMessage(msg string, meta MessageMeta) error {
 			msg = strings.ReplaceAll(msg, expectedMaxLengthVar, fmt.Sprintf("%v", v))
 		}
 	}
+	if strings.Contains(msg, uniqueOriginVar) {
+		if meta.Field != nil {
+			v := *meta.UniqueOrigin
+			msg = strings.ReplaceAll(msg, uniqueOriginVar, v)
+		}
+	}
+	if strings.Contains(msg, uniqueTargetVar) {
+		if meta.Field != nil {
+			v := *meta.UniqueTarget
+			msg = strings.ReplaceAll(msg, uniqueTargetVar, v)
+		}
+	}
 	return errors.New(msg)
 }
 
@@ -135,28 +149,18 @@ func validateRecursive(pChain ChainerType, wrapper *RulesWrapper, key string, da
 		cChain.SetValue(res)
 	}
 
-	// check unique values
-	if wrapper != nil && res != nil && len(rule.Unique) > 0 {
-		for _, unique := range rule.Unique {
-			if wrapper.uniqueValues == nil {
-				wrapper.uniqueValues = &map[string]map[string]interface{}{}
-			}
-
-			if _, exists := (*wrapper.uniqueValues)[unique]; !exists {
-				(*wrapper.uniqueValues)[unique] = make(map[string]interface{})
-			}
-
-			for keyX, val := range (*wrapper.uniqueValues)[unique] {
-				if val == res {
-					return nil, fmt.Errorf("value of '%s' and '%s' fields must be different", keyX, key)
-				}
-			}
-			(*wrapper.uniqueValues)[unique][key] = res
-		}
-	}
-
-	// put filled and null fields
 	if wrapper != nil {
+		// add unique values
+		if res != nil && len(rule.Unique) > 0 {
+			cChain.SetUniques(rule.Unique)
+		}
+
+		// add custom message values
+		if res != nil && rule.CustomMsg.isNotNil() {
+			cChain.SetCustomMsg(&rule.CustomMsg)
+		}
+
+		// put filled and null fields
 		if wrapper.filledField == nil {
 			wrapper.filledField = &[]string{}
 		}

@@ -35,8 +35,8 @@ go get github.com/Rhyanz46/go-map-validator/map_validator
   - on invalid regex message : ✅ ready
   - on type not match message : ✅ ready
   - on min/max data message : ✅ ready
+  - on unique values error : ✅ ready
   - on null data message : ⌛ not ready
-  - on unique values error : ⌛ not ready
   - on enum value not match : ⌛ not ready
   - on `RequiredWithout` error : ⌛ not ready
 
@@ -57,7 +57,7 @@ go get github.com/Rhyanz46/go-map-validator/map_validator
 
 
 ## Road Map
-
+- errors detail mode
 - get from urls params http
 - validation for `base64`
 - handle file size on multipart

@@ -1,6 +1,8 @@
 package map_validator
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestSetKey(t *testing.T) {
 	root := newChainer().SetKey("root")
@@ -107,4 +109,32 @@ func TestMultipleLevelChildren(t *testing.T) {
 	}
 
 	root.GetResult().GetAllKeys()
+}
+
+func TestChainValues(T *testing.T) {
+	root := newChainer().SetKey("root")
+	childa_1 := root.AddChild().SetKeyValue("childa_1", "value+childa_1")
+	childa_2 := root.AddChild().SetKeyValue("childa_2", "value+childa_2")
+	root.AddChild().SetKeyValue("childa_3", "value+childa_3")
+
+	childa_1.AddChild().SetKeyValue("childb_1_d", "value+childb_d")
+	childa_2.AddChild().SetKeyValue("childa_2_x", "value+a").SetUniques([]string{"childa_2_z", "childa_2_y"})
+	childa_2.AddChild().SetKeyValue("childa_2_z", "value+a")
+	childa_2.AddChild().SetKeyValue("childa_2_y", "value+ka")
+	childa_2.AddChild().SetKeyValue("childa_2_sssy", nil)
+	childa_2.AddChild().SetKeyValue("childa_2_m", "value+a")
+	childa_2.AddChild().SetKeyValue("childa_2_g", "value+childa_2_g")
+	childa_2.AddChild().SetKeyValue("childa_2_s", "value+childa_2_s")
+	childa_2.AddChild().SetKeyValue("childa_2_e", "value+childa_2_e")
+
+	childa_1.AddChild().SetKeyValue("childa_1_e", "value+childa_1_e")
+	childa_1.AddChild().SetKeyValue("childa_1_f", "value+childa_1_f").SetUniques([]string{"childa_1_t"})
+	childa_1.AddChild().SetKeyValue("childa_1_t", "value+childa_1_e").SetUniques([]string{"childa_1_e"})
+
+	root.GetResult().RunUniqueChecker()
+	res := root.GetResult()
+	errors := res.GetErrors()
+	if len(errors) != 2 {
+		T.Errorf("Expected have two errors, but we got %d error", len(errors))
+	}
 }
