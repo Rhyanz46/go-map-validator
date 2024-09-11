@@ -42,6 +42,8 @@ type ChainResultType interface {
 	PrintHierarchyWithSeparator(separator string, currentPath string)
 	ToMap() map[string]interface{}
 	RunManipulator() error
+	RunUniqueChecker()
+	GetErrors() []error
 }
 
 type ChainerType interface {
@@ -51,11 +53,20 @@ type ChainerType interface {
 	Forward(index int) ChainerType
 	SetKey(name string) ChainerType
 	GetKey() string
+	SetKeyValue(key string, value interface{}) ChainerType
 	GetParentKeys() []string
 	AddChild() ChainerType
 	LoadFromMap(data map[string]interface{})
 	SetValue(value interface{}) ChainerType
 	GetValue() interface{}
 	SetManipulator(manipulator *func(interface{}) (interface{}, error)) ChainerType
+	SetUniques(uniques []string) ChainerType
+	SetCustomMsg(customMsg *CustomMsg) ChainerType
+	GetUniques() []string
+	AddError(err error) ChainerType
 	GetResult() ChainResultType
+
+	GetChildren() []ChainerType
+	GetParent() ChainerType
+	GetBrothers() []ChainerType
 }

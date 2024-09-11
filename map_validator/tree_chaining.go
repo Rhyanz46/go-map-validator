@@ -8,8 +8,34 @@ type chainState struct {
 	key         string
 	manipulator *func(interface{}) (interface{}, error)
 	value       interface{}
+	CustomMsg   *CustomMsg
+	uniques     []string
+	errs        []error
 	parent      *chainState
 	children    []*chainState
+}
+
+func (cs *chainState) AddError(err error) ChainerType {
+	cs.errs = append(cs.errs, err)
+	return cs
+}
+
+func (cs *chainState) SetCustomMsg(customMsg *CustomMsg) ChainerType {
+	cs.CustomMsg = customMsg
+	return cs
+}
+
+func (cs *chainState) GetErrors() []error {
+	return cs.recursiveGetErrors()
+}
+
+func (cs *chainState) recursiveGetErrors() []error {
+	var errors []error
+	errors = append(errors, cs.errs...)
+	for _, child := range cs.children {
+		errors = append(errors, child.recursiveGetErrors()...)
+	}
+	return errors
 }
 
 func (cs *chainState) SetManipulator(manipulator *func(interface{}) (interface{}, error)) ChainerType {
@@ -51,6 +77,12 @@ func (cs *chainState) GetParentKey() string {
 
 func (cs *chainState) SetKey(name string) ChainerType {
 	cs.key = name
+	return cs
+}
+
+func (cs *chainState) SetKeyValue(key string, value interface{}) ChainerType {
+	cs.value = value
+	cs.key = key
 	return cs
 }
 
@@ -141,12 +173,95 @@ func (cs *chainState) ToMap() map[string]interface{} {
 	return result
 }
 
+func (cs *chainState) GetUniques() []string {
+	return cs.uniques
+}
+
+func (cs *chainState) GetBrothers() []ChainerType {
+	var brothers []ChainerType
+	if cs.GetParent() == nil {
+		return nil
+	}
+
+	for _, child := range cs.GetParent().GetChildren() {
+		if child == nil || cs.GetKey() == child.GetKey() {
+			continue
+		}
+		brothers = append(brothers, child)
+	}
+	return brothers
+}
+
+func (cs *chainState) GetParent() ChainerType {
+	return cs.parent
+}
+
+func (cs *chainState) GetChildren() []ChainerType {
+	var children []ChainerType
+	if cs == nil || cs.children == nil {
+		return []ChainerType{}
+	}
+	for _, child := range cs.children {
+		children = append(children, child)
+	}
+	return children
+}
+
+func (cs *chainState) SetUniques(uniques []string) ChainerType {
+	var removedDuplicated []string
+	for _, unique := range uniques {
+		var found bool
+		for _, removed := range removedDuplicated {
+			if removed == unique {
+				found = true
+				break
+			}
+		}
+		if !found {
+			removedDuplicated = append(removedDuplicated, unique)
+		}
+	}
+	cs.uniques = removedDuplicated
+	return cs
+}
+
+func (cs *chainState) RunUniqueChecker() {
+	if cs.value != nil && len(cs.uniques) > 0 {
+		brothers := cs.GetBrothers()
+		for _, bro := range brothers {
+			if bro.GetValue() == nil {
+				continue
+			}
+			for _, unique := range cs.uniques {
+				originKey := cs.GetKey()
+				targetKey := bro.GetKey()
+				if targetKey == unique && bro.GetValue() == cs.GetValue() {
+					msgError := fmt.Errorf("value of '%s' and '%s' fields must be different", originKey, targetKey)
+					if cs.CustomMsg != nil && cs.CustomMsg.uniqueNotNil() {
+						msgError = buildMessage(*cs.CustomMsg.OnUnique, MessageMeta{
+							Field:        &originKey,
+							UniqueOrigin: &originKey,
+							UniqueTarget: &targetKey,
+						})
+					}
+					cs.AddError(msgError)
+				}
+			}
+		}
+	}
+	for _, child := range cs.children {
+		child.RunUniqueChecker()
+	}
+}
+
 func (cs *chainState) RunManipulator() (err error) {
 	return cs.runManipulate()
 }
 
 func (cs *chainState) runManipulate() (err error) {
+	// check if current value is not nil and has manipulator
 	if cs.value != nil && cs.manipulator != nil {
+		// run manipulator
 		cs.value, err = (*cs.manipulator)(cs.value)
 		if err != nil {
 			return err

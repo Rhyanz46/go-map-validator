@@ -17,6 +17,8 @@ type MessageMeta struct {
 	ExpectedMinLength *int64
 	ExpectedMaxLength *int64
 	ActualType        *reflect.Kind
+	UniqueOrigin      *string
+	UniqueTarget      *string
 }
 
 type EnumField[T any] struct {
@@ -31,6 +33,49 @@ type CustomMsg struct {
 	OnMax         *string
 	OnMin         *string
 	OnRegexString *string
+	OnUnique      *string
+}
+
+func (cm *CustomMsg) uniqueNotNil() bool {
+	return cm.OnUnique != nil
+}
+
+func (cm *CustomMsg) maxNotNil() bool {
+	return cm.OnMax != nil
+}
+
+func (cm *CustomMsg) minNotNil() bool {
+	return cm.OnMin != nil
+}
+
+func (cm *CustomMsg) regexNotNil() bool {
+	return cm.OnRegexString != nil
+}
+
+func (cm *CustomMsg) typeNotMatchNotNil() bool {
+	return cm.OnTypeNotMatch != nil
+}
+
+func (cm *CustomMsg) isNotNil() (notNil bool) {
+	if cm == nil {
+		return
+	}
+	if cm.OnTypeNotMatch != nil {
+		notNil = true
+	}
+	if cm.OnMax != nil {
+		notNil = true
+	}
+	if cm.OnMin != nil {
+		notNil = true
+	}
+	if cm.OnRegexString != nil {
+		notNil = true
+	}
+	if cm.OnUnique != nil {
+		notNil = true
+	}
+	return notNil
 }
 
 type Setting struct {
@@ -66,10 +111,11 @@ type Rules struct {
 	File               bool
 	RegexString        string
 	Unique             []string
-	RequiredWithout    []string
-	RequiredIf         []string
-	Object             *RulesWrapper
-	ListObject         *RulesWrapper
+
+	RequiredWithout []string
+	RequiredIf      []string
+	Object          *RulesWrapper
+	ListObject      *RulesWrapper
 
 	CustomMsg CustomMsg // will support soon
 }
