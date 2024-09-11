@@ -214,6 +214,13 @@ func (state *finalOperation) RunValidate() (*ExtraOperationData, error) {
 		return nil, err
 	}
 
+	chainRes.RunUniqueChecker()
+	for _, err = range chainRes.GetErrors() {
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	manipulatedData := chainRes.ToMap()
 	extraData := &ExtraOperationData{
 		rules:        state.rules,
