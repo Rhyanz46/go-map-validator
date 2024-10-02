@@ -40,9 +40,6 @@ jobs:
           current_version: ${{ steps.latest-tag.outputs.tag }}
           level: patch
 
-      - name: Coveralls GitHub Action
-        uses: coverallsapp/github-action@v2.3.0    
-
       - name: Create Release Notes
         id: create-release
         run: |
