@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
 	"net"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/google/uuid"
 )
 
 func isEqualString(current, allowedField string) bool {
@@ -259,17 +260,29 @@ func validateRecursive(pChain ChainerType, wrapper *RulesWrapper, key string, da
 		}
 	}
 
-	// if object
 	if rule.ListObject != nil && res != nil {
 		listRes := res.([]interface{})
+		var manipulated []interface{}
 		for _, xRes := range listRes {
+			tmpChain := newChainer().SetKey(chainKey)
 			for keyX, ruleX := range rule.ListObject.Rules {
-				_, err = validateRecursive(cChain, rule.Object, keyX, xRes.(map[string]interface{}), ruleX, fromJSONEncoder)
+				_, err = validateRecursive(tmpChain, rule.ListObject, keyX, xRes.(map[string]interface{}), ruleX, fromJSONEncoder)
 				if err != nil {
 					return nil, err
 				}
 			}
+			// collect validated/manipulated item data back into the slice
+			// ensure only fields defined in ListObject rules are included
+			itemMapFull := tmpChain.GetResult().ToMap()
+			filtered := make(map[string]interface{})
+			for keyAllowed := range rule.ListObject.Rules {
+				if val, ok := itemMapFull[keyAllowed]; ok {
+					filtered[keyAllowed] = val
+				}
+			}
+			manipulated = append(manipulated, filtered)
 		}
+		cChain.SetValue(manipulated)
 	}
 
 	return res, nil
