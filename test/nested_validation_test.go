@@ -593,3 +593,93 @@ func TestNestedListDataHTTP(t *testing.T) {
 		t.Errorf("err : %s", err)
 	}
 }
+
+func TestNestedObjectDataHTTP(t *testing.T) {
+	type GoodsRequest struct {
+		Name        string  `json:"name" binding:"required"`
+		Weight      float64 `json:"weight" binding:"required"`
+		Quantity    int     `json:"quantity" binding:"required"`
+		Description string  `json:"description"`
+	}
+	type CreateOrderRequest struct {
+		SenderID                uuid.UUID    `json:"sender_id" binding:"required"`
+		SenderAddress           string       `json:"sender_address" binding:"required"`
+		SenderAddressCity       string       `json:"sender_address_city" binding:"required"`
+		SenderAddressProvince   string       `json:"sender_address_province" binding:"required"`
+		SenderLatitude          float64      `json:"sender_latitude"`
+		SenderLongitude         float64      `json:"sender_longitude"`
+		ReceiverName            string       `json:"receiver_name" binding:"required"`
+		ReceiverPhone           string       `json:"receiver_phone" binding:"required"`
+		ReceiverAddress         string       `json:"receiver_address" binding:"required"`
+		ReceiverAddressCity     string       `json:"receiver_address_city" binding:"required"`
+		ReceiverAddressProvince string       `json:"receiver_address_province" binding:"required"`
+		ReceiverLatitude        float64      `json:"receiver_latitude"`
+		ReceiverLongitude       float64      `json:"receiver_longitude"`
+		Note                    string       `json:"note"`
+		Goods                   GoodsRequest `json:"goods" binding:"required"`
+	}
+
+	// goods dikirim sebagai object (bukan array)
+	jsonStr := `{
+        "goods": {
+            "description": "string",
+            "name": "string",
+            "quantity": 1,
+            "weight": 0
+        },
+        "note": "string",
+        "receiver_address": "string",
+        "receiver_address_city": "string",
+        "receiver_address_province": "string",
+        "receiver_latitude": 0,
+        "receiver_longitude": 0,
+        "receiver_name": "string",
+        "receiver_phone": "string",
+        "sender_address": "string",
+        "sender_address_city": "string",
+        "sender_address_province": "string",
+        "sender_id": "8aa3e797-2453-442f-b1d0-50f7d815bcaf",
+        "sender_latitude": 0,
+        "sender_longitude": 0
+    }`
+
+	req := httptest.NewRequest("POST", "/test", bytes.NewBufferString(jsonStr))
+	req.Header.Set("Content-Type", "application/json")
+
+	jsonHttp, err := map_validator.NewValidateBuilder().SetRules(map_validator.BuildRoles().
+		SetRule("sender_id", map_validator.Rules{Type: reflect.String, UUID: true}).
+		SetRule("sender_address", map_validator.Rules{Type: reflect.String}).
+		SetRule("sender_address_city", map_validator.Rules{Type: reflect.String}).
+		SetRule("sender_address_province", map_validator.Rules{Type: reflect.String}).
+		SetRule("sender_latitude", map_validator.Rules{Type: reflect.Float64}).
+		SetRule("sender_longitude", map_validator.Rules{Type: reflect.Float64}).
+		SetRule("receiver_name", map_validator.Rules{Type: reflect.String}).
+		SetRule("receiver_phone", map_validator.Rules{Type: reflect.String}).
+		SetRule("receiver_address", map_validator.Rules{Type: reflect.String}).
+		SetRule("receiver_address_city", map_validator.Rules{Type: reflect.String}).
+		SetRule("receiver_address_province", map_validator.Rules{Type: reflect.String}).
+		SetRule("receiver_latitude", map_validator.Rules{Type: reflect.Float64}).
+		SetRule("receiver_longitude", map_validator.Rules{Type: reflect.Float64}).
+		SetRule("note", map_validator.Rules{Type: reflect.String}).
+		SetRule("goods", map_validator.Rules{Object: map_validator.BuildRoles().
+			SetRule("name", map_validator.Rules{Type: reflect.String}).
+			SetRule("weight", map_validator.Rules{Type: reflect.Float64}).
+			SetRule("quantity", map_validator.Rules{Type: reflect.Int, Min: map_validator.SetTotal(1)}).
+			SetRule("description", map_validator.Rules{Type: reflect.String}),
+		}).
+		Done()).
+		LoadJsonHttp(req)
+	if err != nil {
+		t.Fatalf("load error: %s", err)
+	}
+
+	validatedData, err := jsonHttp.RunValidate()
+	if err != nil {
+		t.Fatalf("Expected no error: got error: %v", err)
+	}
+
+	var request CreateOrderRequest
+	if bindErr := validatedData.Bind(&request); bindErr != nil {
+		t.Fatalf("Expected bind not to be error, we got : %v", bindErr)
+	}
+}
