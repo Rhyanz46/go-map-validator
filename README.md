@@ -54,6 +54,8 @@ go get github.com/Rhyanz46/go-map-validator/map_validator
 | 4  |    `${actual_length}`    |
 | 5  | `${expected_min_length}` |
 | 6  | `${expected_max_length}` |
+| 7  |    `${unique_origin}`    |
+| 8  |    `${unique_target}`    |
 
 
 ## Road Map
@@ -131,12 +133,12 @@ _, _ = op.RunValidate()
 ### Example 3 ( Echo Framework )
 ```go
 func handleLogin(c echo.Context) error {
-    op, err := map_validator.NewValidateBuilder().SetRules(map_validator.RulesWrapper{
-        Rules: map[string]map_validator.Rules{
-            "email":    {Email: true, Max: map_validator.SetTotal(100)},
-            "password": {Type: reflect.String, Min: map_validator.SetTotal(6), Max: map_validator.SetTotal(30)},
-        },
-    }).LoadJsonHttp(c.Request())
+    jsonHttp, err := map_validator.NewValidateBuilder().SetRules(
+        map_validator.BuildRoles().
+            SetRule("email", map_validator.Rules{Email: true, Max: map_validator.SetTotal(100)}).
+            SetRule("password", map_validator.Rules{Type: reflect.String, Min: map_validator.SetTotal(6), Max: map_validator.SetTotal(30)}).
+            Done(),
+    ).LoadJsonHttp(c.Request())
     if err != nil {
         return c.JSON(http.StatusBadRequest, err)
     }
@@ -163,16 +165,16 @@ type Data struct {
 }
 
 payload := map[string]interface{}{"jenis_kelamin": "laki-laki", "hoby": "Main PS", "umur": 1, "menikah": true}
-op, err := map_validator.NewValidateBuilder().SetRules(map_validator.RulesWrapper{
-    Rules: map[string]map_validator.Rules{
-        "jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
-        "hoby":          {Type: reflect.String, Null: false},
-        "menikah":       {Type: reflect.Bool, Null: false},
-    },
-}).Load(payload)
-if err != nil { t.Fatal(err) }
-extraCheck, err := op.RunValidate()
-if err != nil { t.Fatal(err) }
+err := map_validator.NewValidateBuilder().SetRules(
+    map_validator.BuildRoles().
+        SetRule("jenis_kelamin", map_validator.Rules{Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}}).
+        SetRule("hoby", map_validator.Rules{Type: reflect.String, Null: false}).
+        SetRule("menikah", map_validator.Rules{Type: reflect.Bool, Null: false}).
+        Done(),
+).Load(payload).RunValidate()
+if err != nil {
+    t.Errorf("Expected not have error, but got error : %s", err)
+}
 
 testBind := &Data{}
 if testBind.JK != "" {
@@ -190,16 +192,14 @@ if testBind.JK != payload["jenis_kelamin"] {
 ### Example 5 ( Custom message )
 ```go
 payload := map[string]interface{}{"total": 12, "unit": "KG"}
-validRole := map_validator.RulesWrapper{
-    Rules: map[string]map_validator.Rules{
-        "total": {
-            Type: reflect.Int,
-            CustomMsg: map_validator.CustomMsg{
-                OnTypeNotMatch: map_validator.SetMessage("Total must be a number, but your input is ${actual_type}"),
-            },
+validRole := map_validator.BuildRoles().
+    SetRule("total", map_validator.Rules{
+        Type: reflect.Int,
+        CustomMsg: map_validator.CustomMsg{
+            OnTypeNotMatch: map_validator.SetMessage("Total must be a number, but your input is ${actual_type}"),
         },
-    },
-}
+    }).
+    Done()
 
 check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
 if err != nil {
@@ -209,19 +209,15 @@ _, err = check.RunValidate()
 if err != nil {
     t.Errorf("Expected not have error, but got error : %s", err)
 }
-
 ```
-
 
 ### Example 6 ( Regex validator )
 ```go
-payload := map[string]interface{}{"hp": "+62567888", "email": "dev@ariansaputra.com"}
-validRole := map_validator.RulesWrapper{
-    Rules: map[string]map_validator.Rules{
-        "hp":    {RegexString: `^\+(?:\d{2}[- ]?\d{6}|\d{11})$`},
-        "email": {RegexString: `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`},
-    },
-}
+payload := map[string]interface{}{ "hp": "+62567888", "email": "dev@ariansaputra.com" }
+validRole := map_validator.BuildRoles().
+    SetRule("hp", map_validator.Rules{ RegexString: `^\+(?:\d{2}[- ]?\d{6}|\d{11})$` }).
+    SetRule("email", map_validator.Rules{ RegexString: `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$` }).
+    Done()
 check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
 if err != nil {
     t.Errorf("Expected not have error, but got error : %s", err)
@@ -230,18 +226,14 @@ _, err = check.RunValidate()
 if err != nil {
     t.Errorf("Expected not have error, but got error : %s", err)
 }
-
 ```
-
 
 ### Example 7 ( Unique value )
 ```go
-role := map_validator.RulesWrapper{
-  Rules: map[string]map_validator.Rules{
-    "password":     {Type: reflect.String, Unique: []string{"password"}, Null: true},
-    "new_password": {Type: reflect.String, Unique: []string{"password"}, Null: true},
-  },
-}
+role := map_validator.BuildRoles().
+    SetRule("password", map_validator.Rules{Type: reflect.String, Unique: []string{"password"}, Null: true}).
+    SetRule("new_password", map_validator.Rules{Type: reflect.String, Unique: []string{"password"}, Null: true}).
+    Done()
 payload := map[string]interface{}{
     "password":     "sabalong",
     "new_password": "sabalong",
