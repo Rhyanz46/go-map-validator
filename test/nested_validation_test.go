@@ -19,16 +19,14 @@ func TestInvalidNestedValidation(t *testing.T) {
 		Menikah bool   `map_validator:"menikah" json:"menikah"`
 		Anak    *Orang `map_validator:"anak" json:"anak"`
 	}
-	role := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"nama":          {Type: reflect.String},
-			"umur":          {Type: reflect.Int},
-			"hoby":          {Type: reflect.String, Null: true, IfNull: "-"},
-			"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
-			"menikah":       {Type: reflect.Bool, Null: true, IfNull: false},
-		},
-	}
-	role.Rules["anak"] = map_validator.Rules{Object: &role, Null: true}
+	role := map_validator.BuildRoles().
+		SetRule("nama", map_validator.Rules{Type: reflect.String}).
+		SetRule("umur", map_validator.Rules{Type: reflect.Int}).
+		SetRule("hoby", map_validator.Rules{Type: reflect.String, Null: true, IfNull: "-"}).
+		SetRule("jenis_kelamin", map_validator.Rules{Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}}).
+		SetRule("menikah", map_validator.Rules{Type: reflect.Bool, Null: true, IfNull: false})
+	role.SetRule("anak", map_validator.Rules{Object: role, Null: true})
+
 	child1 := map[string]interface{}{
 		"nama":          "Messi",
 		"jenis_kelamin": "laki-laki",
@@ -76,16 +74,13 @@ func TestValidNestedValidation(t *testing.T) {
 		Menikah bool   `map_validator:"menikah" json:"menikah"`
 		Anak    *Orang `map_validator:"anak" json:"anak"`
 	}
-	role := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"nama":          {Type: reflect.String},
-			"umur":          {Type: reflect.Int},
-			"hoby":          {Type: reflect.String, Null: true, IfNull: "-"},
-			"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
-			"menikah":       {Type: reflect.Bool, Null: true, IfNull: false},
-		},
-	}
-	role.Rules["anak"] = map_validator.Rules{Object: &role, Null: true}
+	role := map_validator.BuildRoles().
+		SetRule("nama", map_validator.Rules{Type: reflect.String}).
+		SetRule("umur", map_validator.Rules{Type: reflect.Int}).
+		SetRule("hoby", map_validator.Rules{Type: reflect.String, Null: true, IfNull: "-"}).
+		SetRule("jenis_kelamin", map_validator.Rules{Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}}).
+		SetRule("menikah", map_validator.Rules{Type: reflect.Bool, Null: true, IfNull: false})
+	role.SetRule("anak", map_validator.Rules{Object: role, Null: true})
 	child1 := map[string]interface{}{
 		"nama":          "Messi",
 		"jenis_kelamin": "laki-laki",
@@ -143,16 +138,14 @@ func TestInvalidMultiNestedValidation(t *testing.T) {
 		Menikah bool   `map_validator:"menikah" json:"menikah"`
 		Anak    *Orang `map_validator:"anak" json:"anak"`
 	}
-	role := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"nama":          {Type: reflect.String},
-			"umur":          {Type: reflect.Int},
-			"hoby":          {Type: reflect.String, Null: true, IfNull: "-"},
-			"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
-			"menikah":       {Type: reflect.Bool, Null: true, IfNull: false},
-		},
-	}
-	role.Rules["anak"] = map_validator.Rules{Object: &role, Null: true}
+	role := map_validator.BuildRoles().
+		SetRule("nama", map_validator.Rules{Type: reflect.String}).
+		SetRule("umur", map_validator.Rules{Type: reflect.Int}).
+		SetRule("hoby", map_validator.Rules{Type: reflect.String, Null: true, IfNull: "-"}).
+		SetRule("jenis_kelamin", map_validator.Rules{Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}}).
+		SetRule("menikah", map_validator.Rules{Type: reflect.Bool, Null: true, IfNull: false})
+	role.SetRule("anak", map_validator.Rules{Object: role, Null: true})
+
 	child1OfChild1 := map[string]interface{}{
 		"nama":          "Ronaldo",
 		"jenis_kelamin": "laki-laki",
@@ -208,16 +201,13 @@ func TestInvalidMultiMultiNestedValidation(t *testing.T) {
 		Menikah bool   `map_validator:"menikah" json:"menikah"`
 		Anak    *Orang `map_validator:"anak" json:"anak"`
 	}
-	role := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"nama":          {Type: reflect.String},
-			"umur":          {Type: reflect.Int},
-			"hoby":          {Type: reflect.String, Null: true, IfNull: "-"},
-			"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
-			"menikah":       {Type: reflect.Bool, Null: true, IfNull: false},
-		},
-	}
-	role.Rules["anak"] = map_validator.Rules{Object: &role, Null: true}
+	role := map_validator.BuildRoles().
+		SetRule("nama", map_validator.Rules{Type: reflect.String}).
+		SetRule("umur", map_validator.Rules{Type: reflect.Int}).
+		SetRule("hoby", map_validator.Rules{Type: reflect.String, Null: true, IfNull: "-"}).
+		SetRule("jenis_kelamin", map_validator.Rules{Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}}).
+		SetRule("menikah", map_validator.Rules{Type: reflect.Bool, Null: true, IfNull: false})
+	role.SetRule("anak", map_validator.Rules{Object: role, Null: true})
 	child1OfChild1OfChild1 := map[string]interface{}{
 		"nama":          false,
 		"jenis_kelamin": "laki-laki",
@@ -281,26 +271,21 @@ func TestNotOptionalInvalidMultiNestedValidation(t *testing.T) {
 		Menikah bool   `map_validator:"menikah" json:"menikah"`
 		Anak    *Orang `map_validator:"anak" json:"anak"`
 	}
-	role := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"nama":          {Type: reflect.String},
-			"umur":          {Type: reflect.Int},
-			"hoby":          {Type: reflect.String, Null: true, IfNull: "-"},
-			"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
-			"menikah":       {Type: reflect.Bool, Null: true, IfNull: false},
-		},
-	}
-	roleChild := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"nama":          {Type: reflect.String},
-			"umur":          {Type: reflect.Int},
-			"hoby":          {Type: reflect.String, Null: true, IfNull: "-"},
-			"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
-			"menikah":       {Type: reflect.Bool, Null: true, IfNull: false},
-		},
-	}
-	roleChild.Rules["anak"] = map_validator.Rules{Object: &roleChild, Null: true}
-	role.Rules["anak"] = map_validator.Rules{Object: &roleChild}
+	role := map_validator.BuildRoles().
+		SetRule("nama", map_validator.Rules{Type: reflect.String}).
+		SetRule("umur", map_validator.Rules{Type: reflect.Int}).
+		SetRule("hoby", map_validator.Rules{Type: reflect.String, Null: true, IfNull: "-"}).
+		SetRule("jenis_kelamin", map_validator.Rules{Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}}).
+		SetRule("menikah", map_validator.Rules{Type: reflect.Bool, Null: true, IfNull: false})
+	roleChild := map_validator.BuildRoles().
+		SetRule("nama", map_validator.Rules{Type: reflect.String}).
+		SetRule("umur", map_validator.Rules{Type: reflect.Int}).
+		SetRule("hoby", map_validator.Rules{Type: reflect.String, Null: true, IfNull: "-"}).
+		SetRule("jenis_kelamin", map_validator.Rules{Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}}).
+		SetRule("menikah", map_validator.Rules{Type: reflect.Bool, Null: true, IfNull: false})
+	roleChild.SetRule("anak", map_validator.Rules{Object: roleChild, Null: true})
+	role.SetRule("anak", map_validator.Rules{Object: roleChild})
+
 	child1OfChild1 := map[string]interface{}{
 		"nama":          "Ronaldo",
 		"jenis_kelamin": "laki-laki",
@@ -356,35 +341,27 @@ func TestInvalidListMultiNestedValidation(t *testing.T) {
 		Menikah bool   `map_validator:"menikah" json:"menikah"`
 		Anak    *Orang `map_validator:"anak" json:"anak"`
 	}
-	lastRole := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"nama":          {Type: reflect.String},
-			"umur":          {Type: reflect.Int},
-			"hoby":          {Type: reflect.String, Null: true, IfNull: "-"},
-			"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
-			"menikah":       {Type: reflect.Bool, Null: true, IfNull: false},
-		},
-	}
-	secondRole := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"nama":          {Type: reflect.String},
-			"umur":          {Type: reflect.Int},
-			"hoby":          {Type: reflect.String, Null: true, IfNull: "-"},
-			"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
-			"menikah":       {Type: reflect.Bool, Null: true, IfNull: false},
-			"anak-anak":     {ListObject: &lastRole},
-		},
-	}
-	rootRole := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"nama":          {Type: reflect.String},
-			"umur":          {Type: reflect.Int},
-			"hoby":          {Type: reflect.String, Null: true, IfNull: "-"},
-			"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
-			"menikah":       {Type: reflect.Bool, Null: true, IfNull: false},
-			"anak":          {Object: &secondRole, Null: true},
-		},
-	}
+	lastRole := map_validator.BuildRoles().
+		SetRule("nama", map_validator.Rules{Type: reflect.String}).
+		SetRule("umur", map_validator.Rules{Type: reflect.Int}).
+		SetRule("hoby", map_validator.Rules{Type: reflect.String, Null: true, IfNull: "-"}).
+		SetRule("jenis_kelamin", map_validator.Rules{Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}}).
+		SetRule("menikah", map_validator.Rules{Type: reflect.Bool, Null: true, IfNull: false})
+	secondRole := map_validator.BuildRoles().
+		SetRule("nama", map_validator.Rules{Type: reflect.String}).
+		SetRule("umur", map_validator.Rules{Type: reflect.Int}).
+		SetRule("hoby", map_validator.Rules{Type: reflect.String, Null: true, IfNull: "-"}).
+		SetRule("jenis_kelamin", map_validator.Rules{Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}}).
+		SetRule("menikah", map_validator.Rules{Type: reflect.Bool, Null: true, IfNull: false}).
+		SetRule("anak-anak", map_validator.Rules{ListObject: lastRole})
+	rootRole := map_validator.BuildRoles().
+		SetRule("nama", map_validator.Rules{Type: reflect.String}).
+		SetRule("umur", map_validator.Rules{Type: reflect.Int}).
+		SetRule("hoby", map_validator.Rules{Type: reflect.String, Null: true, IfNull: "-"}).
+		SetRule("jenis_kelamin", map_validator.Rules{Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}}).
+		SetRule("menikah", map_validator.Rules{Type: reflect.Bool, Null: true, IfNull: false}).
+		SetRule("anak", map_validator.Rules{Object: secondRole, Null: true})
+
 	validLastChild := []map[string]interface{}{
 		{
 			"nama":          "Messi",
@@ -464,22 +441,19 @@ func TestInvalidListMultiNestedValidation(t *testing.T) {
 }
 
 func TestNestedStrict(t *testing.T) {
-	role := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"nama":          {Type: reflect.String},
-			"umur":          {Type: reflect.Int},
-			"hoby":          {Type: reflect.String, Null: true, IfNull: "-"},
-			"jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
-			"menikah":       {Type: reflect.Bool, Null: true, IfNull: false},
-			"anak": {Object: &map_validator.RulesWrapper{
-				Rules: map[string]map_validator.Rules{
-					"nama": {Type: reflect.String},
-					"umur": {Type: reflect.Int},
-				},
-				Setting: map_validator.Setting{Strict: true},
-			}},
-		},
-	}
+	childRole := map_validator.BuildRoles().
+		SetRule("nama", map_validator.Rules{Type: reflect.String}).
+		SetRule("umur", map_validator.Rules{Type: reflect.Int}).
+		SetSetting(map_validator.Setting{Strict: true})
+	role := map_validator.BuildRoles().
+		SetRule("nama", map_validator.Rules{Type: reflect.String}).
+		SetRule("umur", map_validator.Rules{Type: reflect.Int}).
+		SetRule("hoby", map_validator.Rules{Type: reflect.String, Null: true, IfNull: "-"}).
+		SetRule("jenis_kelamin", map_validator.Rules{Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}}).
+		SetRule("menikah", map_validator.Rules{Type: reflect.Bool, Null: true, IfNull: false}).
+		SetRule("anak", map_validator.Rules{
+			Object: childRole})
+
 	payload := map[string]interface{}{
 		"nama":          "Arian Saputra",
 		"jenis_kelamin": "laki-laki",
@@ -577,8 +551,7 @@ func TestNestedListDataHTTP(t *testing.T) {
 			SetRule("weight", map_validator.Rules{Type: reflect.Float64}).
 			SetRule("quantity", map_validator.Rules{Type: reflect.Int, Min: map_validator.SetTotal(1)}).
 			SetRule("description", map_validator.Rules{Type: reflect.String}),
-		}).
-		Done()).
+		})).
 		LoadJsonHttp(req)
 	if err != nil {
 		t.Errorf("load error : %s", err)
@@ -666,8 +639,7 @@ func TestNestedObjectDataHTTP(t *testing.T) {
 			SetRule("weight", map_validator.Rules{Type: reflect.Float64}).
 			SetRule("quantity", map_validator.Rules{Type: reflect.Int, Min: map_validator.SetTotal(1)}).
 			SetRule("description", map_validator.Rules{Type: reflect.String}),
-		}).
-		Done()).
+		})).
 		LoadJsonHttp(req)
 	if err != nil {
 		t.Fatalf("load error: %s", err)

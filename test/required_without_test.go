@@ -1,20 +1,20 @@
 package test
 
 import (
-	"github.com/Rhyanz46/go-map-validator/map_validator"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/Rhyanz46/go-map-validator/map_validator"
 )
 
 func TestRequiredWithout(t *testing.T) {
-	check, err := map_validator.NewValidateBuilder().SetRules(map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"name":          {Type: reflect.String},
-			"flavor":        {Type: reflect.String, RequiredWithout: []string{"custom_flavor"}},
-			"custom_flavor": {Type: reflect.String, RequiredWithout: []string{"flavor"}},
-		},
-	}).Load(map[string]interface{}{
+	role := map_validator.BuildRoles().
+		SetRule("name", map_validator.Rules{Type: reflect.String}).
+		SetRule("flavor", map_validator.Rules{Type: reflect.String, RequiredWithout: []string{"custom_flavor"}}).
+		SetRule("custom_flavor", map_validator.Rules{Type: reflect.String, RequiredWithout: []string{"flavor"}})
+
+	check, err := map_validator.NewValidateBuilder().SetRules(role).Load(map[string]interface{}{
 		"name": "SSD",
 	})
 	if err != nil {
@@ -30,19 +30,17 @@ func TestRequiredWithout(t *testing.T) {
 }
 
 func TestChildRequiredWithout(t *testing.T) {
-	role := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"data": {Object: &map_validator.RulesWrapper{
-				Rules: map[string]map_validator.Rules{
-					"name":          {Type: reflect.String},
-					"expired":       {Type: reflect.String, Null: true},
-					"flavor":        {Type: reflect.String, RequiredWithout: []string{"custom_flavor", "size"}},
-					"custom_flavor": {Type: reflect.String, RequiredWithout: []string{"flavor", "size"}},
-					"size":          {Type: reflect.Int, RequiredWithout: []string{"flavor", "custom_flavor"}},
-				},
-			}},
-		},
-	}
+	roleChild := map_validator.BuildRoles().
+		SetRule("name", map_validator.Rules{Type: reflect.String}).
+		SetRule("expired", map_validator.Rules{Type: reflect.String, Null: true}).
+		SetRule("flavor", map_validator.Rules{Type: reflect.String, RequiredWithout: []string{"custom_flavor", "size"}}).
+		SetRule("custom_flavor", map_validator.Rules{Type: reflect.String, RequiredWithout: []string{"flavor", "size"}}).
+		SetRule("size", map_validator.Rules{Type: reflect.Int, RequiredWithout: []string{"flavor", "custom_flavor"}})
+
+	role := map_validator.
+		BuildRoles().
+		SetRule("data", map_validator.Rules{Object: roleChild})
+
 	payload := map[string]interface{}{
 		"data": map[string]interface{}{
 			"name": "sabalong",
@@ -61,19 +59,16 @@ func TestChildRequiredWithout(t *testing.T) {
 }
 
 func TestClearChildRequiredWithout(t *testing.T) {
-	role := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"data": {Object: &map_validator.RulesWrapper{
-				Rules: map[string]map_validator.Rules{
-					"name":          {Type: reflect.String},
-					"expired":       {Type: reflect.String, Null: true},
-					"flavor":        {Type: reflect.String, RequiredWithout: []string{"custom_flavor", "size"}},
-					"custom_flavor": {Type: reflect.String, RequiredWithout: []string{"flavor", "size"}},
-					"size":          {Type: reflect.Int, RequiredWithout: []string{"flavor", "custom_flavor"}},
-				},
-			}},
-		},
-	}
+	roleChild := map_validator.BuildRoles().
+		SetRule("name", map_validator.Rules{Type: reflect.String}).
+		SetRule("expired", map_validator.Rules{Type: reflect.String, Null: true}).
+		SetRule("flavor", map_validator.Rules{Type: reflect.String, RequiredWithout: []string{"custom_flavor", "size"}}).
+		SetRule("custom_flavor", map_validator.Rules{Type: reflect.String, RequiredWithout: []string{"flavor", "size"}}).
+		SetRule("size", map_validator.Rules{Type: reflect.Int, RequiredWithout: []string{"flavor", "custom_flavor"}})
+
+	role := map_validator.BuildRoles().
+		SetRule("data", map_validator.Rules{Object: roleChild})
+
 	payload := map[string]interface{}{
 		"data": map[string]interface{}{
 			"name": "sabalong",

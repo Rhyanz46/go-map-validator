@@ -1,20 +1,19 @@
 package test
 
 import (
-	"github.com/Rhyanz46/go-map-validator/map_validator"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/Rhyanz46/go-map-validator/map_validator"
 )
 
 func TestRequiredIf(t *testing.T) {
-	check, err := map_validator.NewValidateBuilder().SetRules(map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"name":          {Type: reflect.String},
-			"flavor":        {Type: reflect.String, RequiredWithout: []string{"name"}},
-			"custom_flavor": {Type: reflect.String, RequiredIf: []string{"name"}},
-		},
-	}).Load(map[string]interface{}{
+	role := map_validator.BuildRoles().
+		SetRule("name", map_validator.Rules{Type: reflect.String}).
+		SetRule("flavor", map_validator.Rules{Type: reflect.String, RequiredWithout: []string{"name"}}).
+		SetRule("custom_flavor", map_validator.Rules{Type: reflect.String, RequiredIf: []string{"name"}})
+	check, err := map_validator.NewValidateBuilder().SetRules(role).Load(map[string]interface{}{
 		"name": "SSD",
 		//"custom_flavor": "large",
 	})
@@ -31,16 +30,12 @@ func TestRequiredIf(t *testing.T) {
 }
 
 func TestChildRequiredIfStandardError(t *testing.T) {
-	role := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"data": {Object: &map_validator.RulesWrapper{
-				Rules: map[string]map_validator.Rules{
-					"unit_size": {Type: reflect.Int, RequiredIf: []string{"size"}},
-					"size":      {Type: reflect.Int, RequiredIf: []string{"unit_size"}},
-				},
-			}},
-		},
-	}
+	roleChild := map_validator.BuildRoles().
+		SetRule("unit_size", map_validator.Rules{Type: reflect.Int, RequiredIf: []string{"size"}}).
+		SetRule("size", map_validator.Rules{Type: reflect.Int, RequiredIf: []string{"unit_size"}})
+
+	role := map_validator.BuildRoles().
+		SetRule("data", map_validator.Rules{Object: roleChild})
 	payload := map[string]interface{}{
 		"data": map[string]interface{}{
 			"size": 1,
@@ -60,16 +55,11 @@ func TestChildRequiredIfStandardError(t *testing.T) {
 }
 
 func TestChildRequiredIfStandardOk(t *testing.T) {
-	role := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"data": {Object: &map_validator.RulesWrapper{
-				Rules: map[string]map_validator.Rules{
-					"unit_size": {Type: reflect.Int, RequiredIf: []string{"size"}},
-					"size":      {Type: reflect.Int, RequiredIf: []string{"unit_size"}},
-				},
-			}},
-		},
-	}
+	roleChild := map_validator.BuildRoles().
+		SetRule("unit_size", map_validator.Rules{Type: reflect.Int, RequiredIf: []string{"size"}}).
+		SetRule("size", map_validator.Rules{Type: reflect.Int, RequiredIf: []string{"unit_size"}})
+
+	role := map_validator.BuildRoles().SetRule("data", map_validator.Rules{Object: roleChild})
 	payload := map[string]interface{}{
 		"data": map[string]interface{}{
 			"size":      1,
@@ -89,19 +79,15 @@ func TestChildRequiredIfStandardOk(t *testing.T) {
 }
 
 func TestChildRequiredIf(t *testing.T) {
-	role := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"data": {Object: &map_validator.RulesWrapper{
-				Rules: map[string]map_validator.Rules{
-					"name":          {Type: reflect.String},
-					"flavor":        {Type: reflect.String, RequiredWithout: []string{"custom_flavor", "size"}},
-					"custom_flavor": {Type: reflect.String, RequiredWithout: []string{"flavor", "size"}},
-					"unit_size":     {Enum: &map_validator.EnumField[any]{Items: []string{"GB", "MB", "TB"}}, RequiredIf: []string{"size"}},
-					"size":          {Type: reflect.Int, RequiredWithout: []string{"flavor", "custom_flavor"}, RequiredIf: []string{"unit_size"}},
-				},
-			}},
-		},
-	}
+	childRole := map_validator.BuildRoles().
+		SetRule("name", map_validator.Rules{Type: reflect.String}).
+		SetRule("flavor", map_validator.Rules{Type: reflect.String, RequiredWithout: []string{"custom_flavor", "size"}}).
+		SetRule("custom_flavor", map_validator.Rules{Type: reflect.String, RequiredWithout: []string{"flavor", "size"}}).
+		SetRule("unit_size", map_validator.Rules{Enum: &map_validator.EnumField[any]{Items: []string{"GB", "MB", "TB"}}, RequiredIf: []string{"size"}}).
+		SetRule("size", map_validator.Rules{Type: reflect.Int, RequiredWithout: []string{"flavor", "custom_flavor"}, RequiredIf: []string{"unit_size"}})
+
+	role := map_validator.BuildRoles().
+		SetRule("data", map_validator.Rules{Object: childRole})
 	payload := map[string]interface{}{
 		"data": map[string]interface{}{
 			"name":   "sabalong",

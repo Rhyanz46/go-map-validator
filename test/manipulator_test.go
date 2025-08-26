@@ -1,9 +1,10 @@
 package test
 
 import (
-	"github.com/Rhyanz46/go-map-validator/map_validator"
 	"reflect"
 	"testing"
+
+	"github.com/Rhyanz46/go-map-validator/map_validator"
 )
 
 func TestManipulate(t *testing.T) {
@@ -32,8 +33,7 @@ func TestManipulate(t *testing.T) {
 			SetRule("name", map_validator.Rules{Type: reflect.String}).
 			SetRule("age", map_validator.Rules{Type: reflect.Int}).
 			SetManipulator("name", trimAfterValidation)}).
-		SetManipulator("description", trimAfterValidation).
-		Done()
+		SetManipulator("description", trimAfterValidation)
 
 	xx, err := map_validator.NewValidateBuilder().SetRules(roles).Load(data)
 	extraCheck, err := xx.RunValidate()
@@ -65,8 +65,7 @@ func TestManipulateWithFullBuilderRoles(t *testing.T) {
 	roles := map_validator.BuildRoles().
 		SetRule("description", map_validator.Rules{Type: reflect.String}).
 		SetRule("note", map_validator.Rules{Type: reflect.String}).
-		SetManipulator("description", trimAfterValidation).
-		Done()
+		SetManipulator("description", trimAfterValidation)
 
 	xx, err := map_validator.NewValidateBuilder().SetRules(roles).Load(data)
 	extraCheck, err := xx.RunValidate()
@@ -93,8 +92,7 @@ func TestManipulateOnNullableField(t *testing.T) {
 	roles := map_validator.BuildRoles().
 		SetRule("description", map_validator.Rules{Type: reflect.String, Null: true}).
 		SetRule("note", map_validator.Rules{Type: reflect.String}).
-		SetManipulator("description", trimAfterValidation).
-		Done()
+		SetManipulator("description", trimAfterValidation)
 
 	xx, err := map_validator.NewValidateBuilder().SetRules(roles).Load(data)
 	extraCheck, err := xx.RunValidate()
@@ -124,8 +122,7 @@ func TestManipulateOnMultiFields(t *testing.T) {
 		SetRule("name", map_validator.Rules{Type: reflect.String}).
 		SetRule("description", map_validator.Rules{Type: reflect.String}).
 		SetRule("note", map_validator.Rules{Type: reflect.String}).
-		SetFieldsManipulator([]string{"description", "name"}, trimAfterValidation).
-		Done()
+		SetFieldsManipulator([]string{"description", "name"}, trimAfterValidation)
 
 	xx, err := map_validator.NewValidateBuilder().SetRules(roles).Load(data)
 	extraCheck, err := xx.RunValidate()

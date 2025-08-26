@@ -1,20 +1,21 @@
 package test
 
 import (
-	"github.com/Rhyanz46/go-map-validator/map_validator"
 	"reflect"
 	"testing"
+
+	"github.com/Rhyanz46/go-map-validator/map_validator"
 )
 
 func TestInvalidRegexMessage(t *testing.T) {
 	payload := map[string]interface{}{"hp": "62567888", "email": "devariansaputra.com"}
-	validRole := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"hp": {RegexString: `^\+(?:\d{2}[- ]?\d{6}|\d{11})$`, CustomMsg: map_validator.CustomMsg{
+	validRole := map_validator.
+		BuildRoles().
+		SetRule("hp", map_validator.Rules{
+			RegexString: `^\+(?:\d{2}[- ]?\d{6}|\d{11})$`, CustomMsg: map_validator.CustomMsg{
 				OnRegexString: map_validator.SetMessage("Your ${field} is not valid phone number"),
 			}},
-		},
-	}
+		)
 	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
 	if err != nil {
 		t.Errorf("Expected not have error, but got error : %s", err)
@@ -27,14 +28,10 @@ func TestInvalidRegexMessage(t *testing.T) {
 	if err.Error() != expected {
 		t.Errorf("Expected '%s', but we got '%s' :", expected, err.Error())
 	}
-	validRole = map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"email": {
-				RegexString: `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`,
-				CustomMsg:   map_validator.CustomMsg{OnRegexString: map_validator.SetMessage("Your email is not valid email format")},
-			},
-		},
-	}
+	validRole = map_validator.BuildRoles().SetRule("email", map_validator.Rules{
+		RegexString: `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`,
+		CustomMsg:   map_validator.CustomMsg{OnRegexString: map_validator.SetMessage("Your email is not valid email format")},
+	})
 	expected = "Your email is not valid email format"
 	check, err = map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
 	if err != nil {
@@ -51,13 +48,13 @@ func TestInvalidRegexMessage(t *testing.T) {
 
 func TestValidRegexMessage(t *testing.T) {
 	payload := map[string]interface{}{"hp": "+62567888", "email": "dev@ariansaputra.com"}
-	validRole := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"hp": {RegexString: `^\+(?:\d{2}[- ]?\d{6}|\d{11})$`, CustomMsg: map_validator.CustomMsg{
+	validRole := map_validator.
+		BuildRoles().
+		SetRule("hp", map_validator.Rules{
+			RegexString: `^\+(?:\d{2}[- ]?\d{6}|\d{11})$`, CustomMsg: map_validator.CustomMsg{
 				OnRegexString: map_validator.SetMessage("Your ${field} is not valid phone number"),
-			}},
-		},
-	}
+			}})
+
 	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
 	if err != nil {
 		t.Errorf("Expected not have error, but got error : %s", err)
@@ -70,16 +67,12 @@ func TestValidRegexMessage(t *testing.T) {
 
 func TestInvalidTypeNotMatchMessage(t *testing.T) {
 	payload := map[string]interface{}{"total": "2", "unit": "KG"}
-	validRole := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"total": {
-				Type: reflect.Int64,
-				CustomMsg: map_validator.CustomMsg{
-					OnTypeNotMatch: map_validator.SetMessage("Total must be a number, but your input is ${actual_type}"),
-				},
-			},
+	validRole := map_validator.BuildRoles().SetRule("total", map_validator.Rules{
+		Type: reflect.Int64,
+		CustomMsg: map_validator.CustomMsg{
+			OnTypeNotMatch: map_validator.SetMessage("Total must be a number, but your input is ${actual_type}"),
 		},
-	}
+	})
 	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
 	if err != nil {
 		t.Errorf("Expected not have error, but got error : %s", err)
@@ -96,16 +89,14 @@ func TestInvalidTypeNotMatchMessage(t *testing.T) {
 
 func TestValidTypeNotMatchMessage(t *testing.T) {
 	payload := map[string]interface{}{"total": 12, "unit": "KG"}
-	validRole := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"total": {
-				Type: reflect.Int,
-				CustomMsg: map_validator.CustomMsg{
-					OnTypeNotMatch: map_validator.SetMessage("Total must be a number, but your input is ${actual_type}"),
-				},
+	validRole := map_validator.
+		BuildRoles().
+		SetRule("total", map_validator.Rules{
+			Type: reflect.Int,
+			CustomMsg: map_validator.CustomMsg{
+				OnTypeNotMatch: map_validator.SetMessage("Total must be a number, but your input is ${actual_type}"),
 			},
-		},
-	}
+		})
 	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
 	if err != nil {
 		t.Errorf("Expected not have error, but got error : %s", err)
@@ -118,19 +109,16 @@ func TestValidTypeNotMatchMessage(t *testing.T) {
 
 func TestInvalidLengthMessage(t *testing.T) {
 	payload := map[string]interface{}{"total": 1, "unit": "KG"}
-	validRole := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"total": {
-				Type: reflect.Int,
-				Max:  map_validator.SetTotal(3),
-				Min:  map_validator.SetTotal(2),
-				CustomMsg: map_validator.CustomMsg{
-					OnMin: map_validator.SetMessage("The min size allowed is ${expected_min_length}., but your input is ${actual_length}"),
-					OnMax: map_validator.SetMessage("The max size allowed is ${expected_max_length}., but your input is ${actual_length}"),
-				},
+	validRole := map_validator.BuildRoles().
+		SetRule("total", map_validator.Rules{
+			Type: reflect.Int,
+			Max:  map_validator.SetTotal(3),
+			Min:  map_validator.SetTotal(2),
+			CustomMsg: map_validator.CustomMsg{
+				OnMin: map_validator.SetMessage("The min size allowed is ${expected_min_length}., but your input is ${actual_length}"),
+				OnMax: map_validator.SetMessage("The max size allowed is ${expected_max_length}., but your input is ${actual_length}"),
 			},
-		},
-	}
+		})
 	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
 	if err != nil {
 		t.Errorf("Expected not have error, but got error : %s", err)
@@ -153,30 +141,29 @@ func TestInvalidLengthMessage(t *testing.T) {
 	}
 }
 
-func TestInvalidLengthMessageCaseOne(t *testing.T) {
-	validRole := map_validator.NewValidateBuilder().SetRules(map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"project_id": {UUID: true},
-			"flavor":     {UUID: true, RequiredWithout: []string{"custom_flavor"}},
-			"custom_flavor": {RequiredWithout: []string{"flavor"}, Object: &map_validator.RulesWrapper{Rules: map[string]map_validator.Rules{
-				"size": {
-					Type: reflect.Float64,
-					Min:  map_validator.SetTotal(25),
-					Max:  map_validator.SetTotal(9999999),
-					CustomMsg: map_validator.CustomMsg{
-						OnMin: map_validator.SetMessage("The minimum size allowed is 25 GB."),
-					},
+func TestInvalidLengthMessageCaseOneT(t *testing.T) {
+	rolesss := map_validator.BuildRoles().
+		SetRule("project_id", map_validator.Rules{UUID: true}).
+		SetRule("flavor", map_validator.Rules{UUID: true, RequiredWithout: []string{"custom_flavor"}}).
+		SetRule("custom_flavor", map_validator.Rules{
+			RequiredWithout: []string{"flavor"},
+			Object: map_validator.BuildRoles().SetRule("size", map_validator.Rules{
+				Type: reflect.Float64,
+				Min:  map_validator.SetTotal(25),
+				Max:  map_validator.SetTotal(9999999),
+				CustomMsg: map_validator.CustomMsg{
+					OnMin: map_validator.SetMessage("The minimum size allowed is 25 GB."),
 				},
-			}}},
-			"name":           {Type: reflect.String, Max: map_validator.SetTotal(255)},
-			"description":    {Type: reflect.String, Max: map_validator.SetTotal(500), Null: true},
-			"network_subnet": {IPV4Network: true, RequiredWithout: []string{"vpc"}},
-			"vpc":            {Type: reflect.String, Max: map_validator.SetTotal(255), RequiredWithout: []string{"network_subnet"}},
-			"zone":           {Type: reflect.String, Max: map_validator.SetTotal(255)},
-			"path":           {Type: reflect.String, Max: map_validator.SetTotal(500)},
-		},
-		Setting: map_validator.Setting{Strict: true},
-	})
+			}),
+		}).
+		SetRule("name", map_validator.Rules{Type: reflect.String, Max: map_validator.SetTotal(255)}).
+		SetRule("description", map_validator.Rules{Type: reflect.String, Max: map_validator.SetTotal(500), Null: true}).
+		SetRule("network_subnet", map_validator.Rules{IPV4Network: true, RequiredWithout: []string{"vpc"}}).
+		SetRule("vpc", map_validator.Rules{Type: reflect.String, Max: map_validator.SetTotal(255), RequiredWithout: []string{"network_subnet"}}).
+		SetRule("zone", map_validator.Rules{Type: reflect.String, Max: map_validator.SetTotal(255)}).
+		SetRule("path", map_validator.Rules{Type: reflect.String, Max: map_validator.SetTotal(500)}).
+		SetSetting(*&map_validator.Setting{Strict: true})
+	validRole := map_validator.NewValidateBuilder().SetRules(rolesss)
 	check, err := validRole.Load(map[string]interface{}{
 		"custom_flavor": map[string]interface{}{"size": 99999991},
 		"zone":          "arjuna",
