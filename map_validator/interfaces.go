@@ -70,3 +70,34 @@ type ChainerType interface {
 	GetParent() ChainerType
 	GetBrothers() []ChainerType
 }
+
+// RulesWrapper defines public methods for rulesWrapper
+type RulesWrapper interface {
+	GetRules() map[string]Rules
+	SetRules(rules map[string]Rules) RulesWrapper
+
+	GetRule() Rules
+	SetRule(field string, rule Rules) RulesWrapper
+
+	getSetting() Setting
+	SetSetting(setting Setting) RulesWrapper
+
+	getUniqueValues() *map[string]map[string]interface{}
+	setUniqueValues(values *map[string]map[string]interface{}) RulesWrapper
+
+	getFilledField() *[]string
+	setFilledField(fields *[]string) RulesWrapper
+	appendFilledField(fields string)
+	getNullFields() *[]string
+	setNullFields(fields *[]string) RulesWrapper
+	appendNullFields(fields string)
+
+	getRequiredWithout() *map[string][]string
+	setRequiredWithout(req *map[string][]string) RulesWrapper
+	getRequiredIf() *map[string][]string
+	setRequiredIf(req *map[string][]string) RulesWrapper
+
+	getManipulator() []manipulator
+	SetManipulator(field string, fun func(data interface{}) (result interface{}, err error)) RulesWrapper
+	SetFieldsManipulator(fields []string, fun func(data interface{}) (result interface{}, err error)) RulesWrapper
+}

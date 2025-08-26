@@ -82,8 +82,10 @@ type Setting struct {
 	Strict bool
 }
 
-type RulesWrapper struct {
+// rulesWrapper implements RulesWrapper
+type rulesWrapper struct {
 	Rules           map[string]Rules
+	Rule            Rules
 	Setting         Setting
 	uniqueValues    *map[string]map[string]interface{}
 	filledField     *[]string
@@ -114,8 +116,8 @@ type Rules struct {
 
 	RequiredWithout []string
 	RequiredIf      []string
-	Object          *RulesWrapper
-	ListObject      *RulesWrapper
+	Object          RulesWrapper
+	ListObject      RulesWrapper
 
 	CustomMsg CustomMsg // will support soon
 }
@@ -126,26 +128,26 @@ type FileRequest struct {
 }
 
 type ruleState struct {
-	rules              *RulesWrapper
+	rules              RulesWrapper
 	extension          []ExtensionType
 	strictAllowedValue bool
 }
 
 type dataState struct {
-	rules              *RulesWrapper
+	rules              RulesWrapper
 	extension          []ExtensionType
 	strictAllowedValue bool
 }
 
 type finalOperation struct {
-	rules      *RulesWrapper
+	rules      RulesWrapper
 	loadedFrom loadFromType
 	extension  []ExtensionType
 	data       map[string]interface{}
 }
 
 type ExtraOperationData struct {
-	rules        *RulesWrapper
+	rules        RulesWrapper
 	loadedFrom   *loadFromType
 	data         *map[string]interface{}
 	filledFields []string
