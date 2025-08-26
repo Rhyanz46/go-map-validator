@@ -1,347 +1,200 @@
-# Simple Validator using struct properties as rules
+# go-map-validator
 
-You can integrate with all golang framework using `http.Request` interface
+Simple, declarative validation for Go maps and HTTP payloads with nested and list object support.
 
-examples : https://github.com/Rhyanz46/go-map-validator/tree/main/test
+- Validate `map[string]interface{}` and `http.Request` (JSON or multipart).
+- Compose rules fluently. Support nested object and list of object.
+- Transform values with manipulators and plug custom extensions.
+- Bind validated data back to your struct.
 
-### Install
+Examples: see the test suite: https://github.com/Rhyanz46/go-map-validator/tree/main/test
 
-```shell
+## Install
+
+```bash
 go get github.com/Rhyanz46/go-map-validator/map_validator
 ```
 
-### discussion or updates
-- [On Telegram](https://t.me/addlist/Wi84VFNkvz85MWFl)
+Import: `import "github.com/Rhyanz46/go-map-validator/map_validator"`
+
+## Quick Start
+
+```go
+// Validate a map and bind to struct
+payload := map[string]interface{}{"email": "dev@example.com", "password": "secret123"}
+
+rules := map_validator.BuildRoles().
+    SetRule("email", map_validator.Rules{Type: reflect.String, Email: true, Max: map_validator.SetTotal(100)}).
+    SetRule("password", map_validator.Rules{Type: reflect.String, Min: map_validator.SetTotal(6), Max: map_validator.SetTotal(30)}).
+    Done()
+
+op, err := map_validator.NewValidateBuilder().SetRules(rules).Load(payload)
+if err != nil { panic(err) }
+extra, err := op.RunValidate()
+if err != nil { panic(err) }
+
+type Login struct {
+    Email    string `json:"email"`
+    Password string `json:"password"`
+}
+var dto Login
+if err := extra.Bind(&dto); err != nil { panic(err) }
+```
 
 ## Features
 
-- validate value in `map[string]interface{}` by keys
-- validate data from `http.Request` json/multipart
-  - support file upload
-- Unique Value
-  - ex case : `old_password` and `new_password` cant be using same value
-- RequiredWithout check
-  - ex case : the field `flavor` is required if `custom_flavor` is null
-- enum value check
-- min/max length data check
-- email field check
-- uuid field check
-- IPv4 field check
-- IPv4 Network check
-- regex on string validation
-- nested validation 🔥
-- you can create your own extension 🔥🔥🔥🔥 (example : [https://github.com/Rhyanz46/go-map-validator/example_extensions/](https://github.com/Rhyanz46/go-map-validator/tree/main/example_extensions))
-- custom message :
-  - on invalid regex message : ✅ ready
-  - on type not match message : ✅ ready
-  - on min/max data message : ✅ ready
-  - on unique values error : ✅ ready
-  - on null data message : ⌛ not ready
-  - on enum value not match : ⌛ not ready
-  - on `RequiredWithout` error : ⌛ not ready
+- Validate map by keys and HTTP JSON/multipart (file upload supported).
+- Types via `reflect.Kind` with nullable fields (`Null`) and default (`IfNull`).
+- `Enum`, `RegexString`, `Email`, `UUID`/`UUIDToString`.
+- IPv4 validators: `IPV4`, `IPV4Network` (.0 network), `IPv4OptionalPrefix` (CIDR optional).
+- `Min`/`Max` for strings, numeric, and slices.
+- Nested object (`Object`) and list of object (`ListObject`).
+- Uniqueness across sibling fields (`Unique`).
+- Conditional required: `RequiredWithout` and `RequiredIf`.
+- Strict mode to reject unknown keys (`Setting{Strict:true}`).
+- Custom messages for type/regex/min/max/unique.
+- Manipulators to post-process values.
+- Extensions lifecycle hooks.
 
-## On Progress
+## HTTP Integration (JSON)
 
-- validation for one data value only
-
-## Custom Message Variables
-
-| No |      Variable Name       |
-|:--:|:------------------------:| 
-| 1  |        `${field}`        |
-| 2  |    `${expected_type}`    |
-| 3  |     `${actual_type}`     |
-| 4  |    `${actual_length}`    |
-| 5  | `${expected_min_length}` |
-| 6  | `${expected_max_length}` |
-
-
-## Road Map
-- errors detail mode
-- get from urls params http
-- validation for `base64`
-- handle file size on multipart
-- extension for generate OpenAPI Spec that support with this package
-- image resolution validation
-- multi validation on one field (ex : IPv4: true, UUID: true)
-
-
-## example :
-
-### Example 1
 ```go
-payload := map[string]interface{}{"jenis_kelamin": "laki-laki", "hoby": "Main PS", "umur": 1, "menikah": true}
-
-op, err := map_validator.NewValidateBuilder().SetRules(map_validator.RulesWrapper{
-    Rules: map[string]map_validator.Rules{
-        "jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
-        "hoby":          {Type: reflect.String, Null: false},
-        "menikah":       {Type: reflect.Bool, Null: false},
-    },
-}).Load(payload)
-if err != nil {
-    t.Fatalf("load error: %s", err)
-}
-if _, err = op.RunValidate(); err != nil {
-    t.Errorf("Expected not have error, but got error : %s", err)
-}
-
-op, err = map_validator.NewValidateBuilder().SetRules(map_validator.RulesWrapper{
-    Rules: map[string]map_validator.Rules{
-        "jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
-        "hoby":          {Type: reflect.Int, Null: false},
-        "menikah":       {Type: reflect.Bool, Null: false},
-    },
-}).Load(payload)
-if err != nil {
-    t.Fatalf("load error: %s", err)
-}
-if _, err = op.RunValidate(); err == nil {
-    t.Error("Expected have an error, but you got no error")
-}
+op, err := map_validator.NewValidateBuilder().SetRules(rules).LoadJsonHttp(req)
+if err != nil { /* handle */ }
+extra, err := op.RunValidate()
+if err != nil { /* handle */ }
+// Bind to your DTO
+var dto MyDTO
+_ = extra.Bind(&dto)
 ```
 
-### Example 2 ( Nested Object Validation )
+Note: JSON numbers decode as `float64`. The validator tolerates integer-family comparisons when rules expect an int kind.
+
+## Nested Objects
+
 ```go
-filterRules := map_validator.BuildRoles().
-  SetRule("search", map_validator.Rules{Type: reflect.String, Null: true}).
-  SetRule("organization_id", map_validator.Rules{UUID: true, Null: true}).
-  Done()
+filter := map_validator.BuildRoles().
+    SetRule("search", map_validator.Rules{Type: reflect.String, Null: true}).
+    SetRule("organization_id", map_validator.Rules{UUID: true, Null: true}).
+    Done()
 
 parent := map_validator.BuildRoles().
-  SetRule("filter", map_validator.Rules{Object: &filterRules, Null: true}).
-  SetRule("rows_per_page", map_validator.Rules{Type: reflect.Int64, Null: true}).
-  SetRule("page_index", map_validator.Rules{Type: reflect.Int64, Null: true}).
-  SetRule("sort", map_validator.Rules{
-      Null:   true,
-      IfNull: "FULL_NAME:DESC",
-      Type:   reflect.String,
-      Enum:   &map_validator.EnumField[any]{Items: []string{"FULL_NAME:DESC", "FULL_NAME:ASC", "EMAIL:ASC", "EMAIL:DESC"}},
-  }).
-  SetSetting(map_validator.Setting{Strict: true}).
-  Done()
+    SetRule("filter", map_validator.Rules{Object: filter, Null: true}).
+    SetRule("rows_per_page", map_validator.Rules{Type: reflect.Int64, Null: true}).
+    SetRule("page_index", map_validator.Rules{Type: reflect.Int64, Null: true}).
+    SetRule("sort", map_validator.Rules{
+        Null:   true,
+        IfNull: "FULL_NAME:DESC",
+        Type:   reflect.String,
+        Enum:   &map_validator.EnumField[any]{Items: []string{"FULL_NAME:DESC","FULL_NAME:ASC","EMAIL:ASC","EMAIL:DESC"}},
+    }).
+    SetSetting(map_validator.Setting{Strict: true}).
+    Done()
 
-op, err := map_validator.NewValidateBuilder().SetRules(parent).Load(map[string]interface{}{})
-if err != nil { t.Fatal(err) }
-_, _ = op.RunValidate()
-```
-![image](https://github.com/Rhyanz46/go-map-validator/assets/24217568/9f58dde4-b175-4a4f-9369-fa0974c25942)
-
-
-### Example 3 ( Echo Framework )
-```go
-func handleLogin(c echo.Context) error {
-    op, err := map_validator.NewValidateBuilder().SetRules(map_validator.RulesWrapper{
-        Rules: map[string]map_validator.Rules{
-            "email":    {Email: true, Max: map_validator.SetTotal(100)},
-            "password": {Type: reflect.String, Min: map_validator.SetTotal(6), Max: map_validator.SetTotal(30)},
-        },
-    }).LoadJsonHttp(c.Request())
-    if err != nil {
-        return c.JSON(http.StatusBadRequest, err)
-    }
-    if _, err := op.RunValidate(); err != nil {
-        return c.JSON(http.StatusBadRequest, err)
-    }
-    return c.NoContent(http.StatusOK)
-}
-
-func main() {
-    e := echo.New()
-    e.POST("/login", handleLogin)
-    e.Start(":3000")
-}
-
+extra, err := map_validator.NewValidateBuilder().SetRules(parent).Load(map[string]interface{}{}).RunValidate()
+_ = extra; _ = err
 ```
 
-### Example 4 ( Bind To Struct )
+## List of Objects
+
 ```go
-type Data struct {
-    JK      string `json:"jenis_kelamin"`
-    Hoby    string `json:"hoby"`
-    Menikah bool   `json:"menikah"`
-}
-
-payload := map[string]interface{}{"jenis_kelamin": "laki-laki", "hoby": "Main PS", "umur": 1, "menikah": true}
-op, err := map_validator.NewValidateBuilder().SetRules(map_validator.RulesWrapper{
-    Rules: map[string]map_validator.Rules{
-        "jenis_kelamin": {Enum: &map_validator.EnumField[any]{Items: []string{"laki-laki", "perempuan"}}},
-        "hoby":          {Type: reflect.String, Null: false},
-        "menikah":       {Type: reflect.Bool, Null: false},
-    },
-}).Load(payload)
-if err != nil { t.Fatal(err) }
-extraCheck, err := op.RunValidate()
-if err != nil { t.Fatal(err) }
-
-testBind := &Data{}
-if testBind.JK != "" {
-    t.Errorf("Expected : '' But you got : %s", testBind.JK)
-}
-if err := extraCheck.Bind(testBind); err != nil { t.Fatal(err) }
-
-if testBind.JK != payload["jenis_kelamin"] {
-    t.Errorf("Expected : %s But you got : %s", payload["jenis_kelamin"], testBind.JK)
-}
-
-```
-
-
-### Example 5 ( Custom message )
-```go
-payload := map[string]interface{}{"total": 12, "unit": "KG"}
-validRole := map_validator.RulesWrapper{
-    Rules: map[string]map_validator.Rules{
-        "total": {
-            Type: reflect.Int,
-            CustomMsg: map_validator.CustomMsg{
-                OnTypeNotMatch: map_validator.SetMessage("Total must be a number, but your input is ${actual_type}"),
-            },
-        },
-    },
-}
-
-check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
-if err != nil {
-    t.Errorf("Expected not have error, but got error : %s", err)
-}
-_, err = check.RunValidate()
-if err != nil {
-    t.Errorf("Expected not have error, but got error : %s", err)
-}
-
-```
-
-
-### Example 6 ( Regex validator )
-```go
-payload := map[string]interface{}{"hp": "+62567888", "email": "dev@ariansaputra.com"}
-validRole := map_validator.RulesWrapper{
-    Rules: map[string]map_validator.Rules{
-        "hp":    {RegexString: `^\+(?:\d{2}[- ]?\d{6}|\d{11})$`},
-        "email": {RegexString: `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`},
-    },
-}
-check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
-if err != nil {
-    t.Errorf("Expected not have error, but got error : %s", err)
-}
-_, err = check.RunValidate()
-if err != nil {
-    t.Errorf("Expected not have error, but got error : %s", err)
-}
-
-```
-
-
-### Example 7 ( Unique value )
-```go
-role := map_validator.RulesWrapper{
-  Rules: map[string]map_validator.Rules{
-    "password":     {Type: reflect.String, Unique: []string{"password"}, Null: true},
-    "new_password": {Type: reflect.String, Unique: []string{"password"}, Null: true},
-  },
-}
-payload := map[string]interface{}{
-    "password":     "sabalong",
-    "new_password": "sabalong",
-}
-check, err := map_validator.NewValidateBuilder().SetRules(role).Load(payload)
-if err != nil {
-    t.Errorf("Expected not have error, but got error : %s", err)
-    return
-}
-expected := "value of 'password' and 'new_password' fields must be different"
-_, err = check.RunValidate()
-if err.Error() != expected {
-    t.Errorf("Expected :%s. But you got : %s", expected, err)
-}
-```
-
-### Example 8 ( HTTP JSON with ListObject + Bind )
-```go
-// Define your request struct with a slice field
-type GoodsRequest struct {
-    Name        string  `json:"name"`
-    Weight      float64 `json:"weight"`
-    Quantity    int     `json:"quantity"`
-    Description string  `json:"description"`
-}
-type CreateOrderRequest struct {
-    SenderID                string         `json:"sender_id"`
-    SenderAddress           string         `json:"sender_address"`
-    SenderAddressCity       string         `json:"sender_address_city"`
-    SenderAddressProvince   string         `json:"sender_address_province"`
-    SenderLatitude          float64        `json:"sender_latitude"`
-    SenderLongitude         float64        `json:"sender_longitude"`
-    ReceiverName            string         `json:"receiver_name"`
-    ReceiverPhone           string         `json:"receiver_phone"`
-    ReceiverAddress         string         `json:"receiver_address"`
-    ReceiverAddressCity     string         `json:"receiver_address_city"`
-    ReceiverAddressProvince string         `json:"receiver_address_province"`
-    ReceiverLatitude        float64        `json:"receiver_latitude"`
-    ReceiverLongitude       float64        `json:"receiver_longitude"`
-    Note                    string         `json:"note"`
-    Goods                   []GoodsRequest `json:"goods"`
-}
-
-// Sample JSON (goods as an array)
-jsonStr := `{
-  "goods": [
-    {"description":"string","name":"string","quantity":1,"weight":0}
-  ],
-  "note":"string",
-  "receiver_address":"string",
-  "receiver_address_city":"string",
-  "receiver_address_province":"string",
-  "receiver_latitude":0,
-  "receiver_longitude":0,
-  "receiver_name":"string",
-  "receiver_phone":"string",
-  "sender_address":"string",
-  "sender_address_city":"string",
-  "sender_address_province":"string",
-  "sender_id":"8aa3e797-2453-442f-b1d0-50f7d815bcaf",
-  "sender_latitude":0,
-  "sender_longitude":0
-}`
-
-req := httptest.NewRequest("POST", "/orders", bytes.NewBufferString(jsonStr))
-req.Header.Set("Content-Type", "application/json")
+item := map_validator.BuildRoles().
+    SetRule("name", map_validator.Rules{Type: reflect.String}).
+    SetRule("quantity", map_validator.Rules{Type: reflect.Int, Min: map_validator.SetTotal(1)}).
+    Done()
 
 rules := map_validator.BuildRoles().
-  SetRule("sender_id", map_validator.Rules{Type: reflect.String, UUID: true}).
-  SetRule("sender_address", map_validator.Rules{Type: reflect.String}).
-  SetRule("sender_address_city", map_validator.Rules{Type: reflect.String}).
-  SetRule("sender_address_province", map_validator.Rules{Type: reflect.String}).
-  SetRule("sender_latitude", map_validator.Rules{Type: reflect.Float64}).
-  SetRule("sender_longitude", map_validator.Rules{Type: reflect.Float64}).
-  SetRule("receiver_name", map_validator.Rules{Type: reflect.String}).
-  SetRule("receiver_phone", map_validator.Rules{Type: reflect.String}).
-  SetRule("receiver_address", map_validator.Rules{Type: reflect.String}).
-  SetRule("receiver_address_city", map_validator.Rules{Type: reflect.String}).
-  SetRule("receiver_address_province", map_validator.Rules{Type: reflect.String}).
-  SetRule("receiver_latitude", map_validator.Rules{Type: reflect.Float64}).
-  SetRule("receiver_longitude", map_validator.Rules{Type: reflect.Float64}).
-  SetRule("note", map_validator.Rules{Type: reflect.String}).
-  SetRule("goods", map_validator.Rules{ListObject: map_validator.BuildRoles().
-    SetRule("name", map_validator.Rules{Type: reflect.String}).
-    SetRule("weight", map_validator.Rules{Type: reflect.Float64}).
-    SetRule("quantity", map_validator.Rules{Type: reflect.Int, Min: map_validator.SetTotal(1)}).
-    SetRule("description", map_validator.Rules{Type: reflect.String}),
+    SetRule("goods", map_validator.Rules{ListObject: item}).
+    Done()
+
+payload := map[string]interface{}{
+    "goods": []interface{}{
+        map[string]interface{}{"name": "Apple", "quantity": 2},
+    },
+}
+_, err := map_validator.NewValidateBuilder().SetRules(rules).Load(payload).RunValidate()
+if err != nil { panic(err) }
+```
+
+When using `ListObject`, the input must be an array of objects. Sending a single object yields: `"field 'goods' is not valid list object"`.
+
+## Unique and Conditional Required
+
+```go
+rules := map_validator.BuildRoles().
+    SetRule("password", map_validator.Rules{Type: reflect.String, Null: true}).
+    SetRule("new_password", map_validator.Rules{Type: reflect.String, Unique: []string{"password"}, Null: true}).
+    SetRule("flavor", map_validator.Rules{Type: reflect.String, RequiredWithout: []string{"custom_flavor"}}).
+    SetRule("custom_flavor", map_validator.Rules{Type: reflect.String, RequiredIf: []string{"flavor"}}).
+    Done()
+```
+
+## Custom Messages
+
+Supported fields in `CustomMsg`:
+- `OnTypeNotMatch`, `OnRegexString`, `OnMin`, `OnMax`, `OnUnique`.
+
+Message variables:
+- `${field}`, `${expected_type}`, `${actual_type}`, `${actual_length}`, `${expected_min_length}`, `${expected_max_length}`, `${unique_origin}`, `${unique_target}`.
+
+```go
+rules := map_validator.BuildRoles().
+  SetRule("total", map_validator.Rules{
+    Type: reflect.Int,
+    Min:  map_validator.SetTotal(2),
+    Max:  map_validator.SetTotal(3),
+    CustomMsg: map_validator.CustomMsg{
+      OnMin: map_validator.SetMessage("Min is ${expected_min_length}, got ${actual_length}"),
+      OnMax: map_validator.SetMessage("Max is ${expected_max_length}, got ${actual_length}"),
+    },
   }).
   Done()
-
-jsonHttp, err := map_validator.NewValidateBuilder().SetRules(rules).LoadJsonHttp(req)
-if err != nil { panic(err) }
-
-extra, err := jsonHttp.RunValidate()
-if err != nil { panic(err) }
-
-var reqDTO CreateOrderRequest
-if err := extra.Bind(&reqDTO); err != nil { panic(err) }
-
-// Note: "goods" MUST be an array when using ListObject.
-// If you send an object instead, the validator returns:
-//   "field 'goods' is not valid list object"
 ```
+
+## Manipulators (Post-process)
+
+```go
+rules := map_validator.BuildRoles().
+  SetRule("name", map_validator.Rules{Type: reflect.String}).
+  SetManipulator("name", func(v interface{}) (interface{}, error) {
+    s := strings.TrimSpace(v.(string))
+    return strings.ToUpper(s), nil
+  }).
+  Done()
+```
+
+Manipulators run after validation and before `Bind()` on the built value tree (including nested/list fields with matching keys).
+
+## Extensions
+
+Implement `ExtensionType` to hook into load/validate lifecycle. Example scaffold: `example_extensions/example.go`.
+
+Use-cases:
+- Normalize/transform input across many fields.
+- Convert string→number for multipart forms.
+- Enrich data or apply cross-cutting rules.
+
+## Strict Mode
+
+Set `Setting{Strict:true}` in a rules group to reject any unknown keys at that object level. Apply again for nested rules where needed.
+
+## Notes & Caveats
+
+- JSON numbers decode as `float64`. Integer-family kinds are tolerated on JSON input.
+- `LoadFormHttp`: non-file values arrive as strings; there is no automatic string→int/float/bool parsing. Use a manipulator or extension to convert.
+- Email validation is simple (checks `@` and `.`), not full RFC compliance.
+- Error reporting returns the first encountered error (no multi-error aggregation with field paths yet).
+- Custom messages are not yet available for: enum mismatch, null errors, and RequiredWithout/If specific messages.
+
+## Roadmap
+
+- Detailed error reporting with field paths and multi-error aggregation.
+- URL params extraction helpers.
+- Base64 validation.
+- Multipart file size limits and image resolution checks.
+- OpenAPI spec generator extension.
+- Multi-validator per field (e.g., IPv4 + UUID combined).
+
+## Community
+
+- Updates/Discussion: [Telegram](https://t.me/addlist/Wi84VFNkvz85MWFl)
