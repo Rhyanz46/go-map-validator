@@ -12,7 +12,7 @@ func NewValidateBuilder() *ruleState {
 }
 
 func (state *ruleState) SetRules(validations RulesWrapper) *dataState {
-	if len(validations.GetRules()) == 0 {
+	if len(validations.getRules()) == 0 {
 		panic("you need to set roles")
 	}
 
@@ -134,7 +134,7 @@ func (state *dataState) LoadFormHttp(r *http.Request) (*finalOperation, error) {
 	}
 	mapData := map[string]interface{}{}
 	allowType := []reflect.Kind{reflect.String, reflect.Int, reflect.Bool}
-	for key, rule := range state.rules.GetRules() {
+	for key, rule := range state.rules.getRules() {
 		var isAllowType bool
 		if rule.File {
 			file, fileInfo, err := r.FormFile(key)
@@ -196,7 +196,7 @@ func (state *finalOperation) RunValidate() (*ExtraOperationData, error) {
 			return nil, err
 		}
 	}
-	for key, rule := range state.rules.GetRules() {
+	for key, rule := range state.rules.getRules() {
 		data, err := validateRecursive(initChain, state.rules, key, state.data, rule, state.loadedFrom)
 		if err != nil {
 			return nil, err

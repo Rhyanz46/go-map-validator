@@ -1,6 +1,6 @@
 package map_validator
 
-func BuildRoles() *rulesWrapper {
+func BuildRoles() RulesWrapper {
 	return &rulesWrapper{}
 }
 
@@ -29,7 +29,7 @@ func (rw *rulesWrapper) SetSetting(setting Setting) RulesWrapper {
 	return rw
 }
 
-func (rw *rulesWrapper) GetRules() map[string]Rules {
+func (rw *rulesWrapper) getRules() map[string]Rules {
 	return rw.Rules
 }
 
@@ -38,9 +38,9 @@ func (rw *rulesWrapper) GetRules() map[string]Rules {
 // 	return rw
 // }
 
-func (rw *rulesWrapper) GetRule() Rules {
-	return rw.Rule
-}
+// func (rw *rulesWrapper) GetRule() Rules {
+// 	return rw.Rule
+// }
 
 func (rw *rulesWrapper) getSetting() Setting {
 	return rw.Setting

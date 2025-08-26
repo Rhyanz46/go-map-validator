@@ -131,7 +131,7 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 	if wrapper != nil && wrapper.getSetting().Strict {
 		var allowedKeys []string
 		keys := getAllKeys(data)
-		for XKey, _ := range wrapper.GetRules() {
+		for XKey, _ := range wrapper.getRules() {
 			allowedKeys = append(allowedKeys, XKey)
 		}
 		for _, XKey := range keys {
@@ -175,7 +175,7 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 			wrapper.appendNullFields(key)
 		}
 
-		if len(wrapper.GetRules()) == len(*wrapper.getNullFields())+len(*wrapper.getFilledField()) {
+		if len(wrapper.getRules()) == len(*wrapper.getNullFields())+len(*wrapper.getFilledField()) {
 			endOfLoop = true
 		}
 
@@ -252,7 +252,7 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 
 	// if list
 	if rule.Object != nil && res != nil {
-		for keyX, ruleX := range rule.Object.GetRules() {
+		for keyX, ruleX := range rule.Object.getRules() {
 			_, err = validateRecursive(cChain, rule.Object, keyX, res.(map[string]interface{}), ruleX, fromJSONEncoder)
 			if err != nil {
 				return nil, err
@@ -265,7 +265,7 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 		var manipulated []interface{}
 		for _, xRes := range listRes {
 			tmpChain := newChainer().SetKey(chainKey)
-			for keyX, ruleX := range rule.ListObject.GetRules() {
+			for keyX, ruleX := range rule.ListObject.getRules() {
 				_, err = validateRecursive(tmpChain, rule.ListObject, keyX, xRes.(map[string]interface{}), ruleX, fromJSONEncoder)
 				if err != nil {
 					return nil, err
@@ -275,7 +275,7 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 			// ensure only fields defined in ListObject rules are included
 			itemMapFull := tmpChain.GetResult().ToMap()
 			filtered := make(map[string]interface{})
-			for keyAllowed := range rule.ListObject.GetRules() {
+			for keyAllowed := range rule.ListObject.getRules() {
 				if val, ok := itemMapFull[keyAllowed]; ok {
 					filtered[keyAllowed] = val
 				}
