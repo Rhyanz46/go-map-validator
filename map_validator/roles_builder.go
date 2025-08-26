@@ -33,10 +33,10 @@ func (rw *rulesWrapper) GetRules() map[string]Rules {
 	return rw.Rules
 }
 
-func (rw *rulesWrapper) SetRules(rules map[string]Rules) RulesWrapper {
-	rw.Rules = rules
-	return rw
-}
+// func (rw *rulesWrapper) SetRules(rules map[string]Rules) RulesWrapper {
+// 	rw.Rules = rules
+// 	return rw
+// }
 
 func (rw *rulesWrapper) GetRule() Rules {
 	return rw.Rule
