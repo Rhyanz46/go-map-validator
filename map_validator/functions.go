@@ -148,11 +148,10 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 	}
 
 	if rule.isList() {
-		// res, err = validateInterface(data, rule, loadedFrom)
-		// if err != nil {
-		// 	return nil, err
-		// }
-		return nil, nil
+		res, err = validateInterface(data, rule, loadedFrom)
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		res, err = validateMapInterface(key, data, rule, loadedFrom)
 		if err != nil {
