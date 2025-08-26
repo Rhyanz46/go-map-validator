@@ -85,7 +85,8 @@ type Setting struct {
 // rulesWrapper implements RulesWrapper
 type rulesWrapper struct {
 	Rules           map[string]Rules
-	Rule            Rules
+	ListRules       ListRules
+	isListRules     bool
 	Setting         Setting
 	uniqueValues    *map[string]map[string]interface{}
 	filledField     *[]string
@@ -93,6 +94,12 @@ type rulesWrapper struct {
 	requiredWithout *map[string][]string
 	requiredIf      *map[string][]string
 	manipulator     []manipulator
+}
+
+type ListRules struct {
+	Min    *int64
+	Max    *int64
+	Unique bool
 }
 
 type Rules struct {
@@ -118,6 +125,7 @@ type Rules struct {
 	RequiredIf      []string
 	Object          RulesWrapper
 	ListObject      RulesWrapper
+	List            ListRulesWrapper
 
 	CustomMsg CustomMsg // will support soon
 }

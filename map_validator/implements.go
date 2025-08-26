@@ -237,3 +237,7 @@ func (state *finalOperation) RunValidate() (*ExtraOperationData, error) {
 	}
 	return extraData, nil
 }
+
+func (state *Rules) isList() bool {
+	return state.List != nil
+}

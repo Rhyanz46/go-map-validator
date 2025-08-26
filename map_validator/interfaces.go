@@ -98,3 +98,7 @@ type RulesWrapper interface {
 	SetManipulator(field string, fun func(data interface{}) (result interface{}, err error)) RulesWrapper
 	SetFieldsManipulator(fields []string, fun func(data interface{}) (result interface{}, err error)) RulesWrapper
 }
+
+type ListRulesWrapper interface {
+	SetListRule(rule ListRules) ListRulesWrapper
+}

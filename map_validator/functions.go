@@ -126,7 +126,13 @@ func buildMessage(msg string, meta MessageMeta) error {
 
 func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, data map[string]interface{}, rule Rules, loadedFrom loadFromType) (interface{}, error) {
 	//child and parent chain
-	cChain := pChain.AddChild().SetKey(key)
+	var res interface{}
+	var err error
+	chainKey := key
+	if rule.isList() {
+		chainKey = fmt.Sprintf("%s[%d]", pChain.GetKey(), len(pChain.GetChildren())-1)
+	}
+	cChain := pChain.AddChild().SetKey(chainKey)
 	var endOfLoop bool
 	if wrapper != nil && wrapper.getSetting().Strict {
 		var allowedKeys []string
@@ -136,14 +142,22 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 		}
 		for _, XKey := range keys {
 			if !isDataInList(XKey, allowedKeys) {
-				return nil, errors.New(fmt.Sprintf("'%s' is not allowed key", XKey))
+				return nil, fmt.Errorf("'%s' is not allowed key", XKey)
 			}
 		}
 	}
 
-	res, err := validate(key, data, rule, loadedFrom)
-	if err != nil {
-		return nil, err
+	if rule.isList() {
+		// res, err = validateInterface(data, rule, loadedFrom)
+		// if err != nil {
+		// 	return nil, err
+		// }
+		return nil, nil
+	} else {
+		res, err = validateMapInterface(key, data, rule, loadedFrom)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if res != nil {
@@ -213,7 +227,7 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 				}
 			}
 			if !required {
-				return nil, errors.New(fmt.Sprintf("if field '%s' is null you need to put value in %v field", field, dependenciesField))
+				return nil, fmt.Errorf("if field '%s' is null you need to put value in %v field", field, dependenciesField)
 			}
 		}
 	}
@@ -245,7 +259,7 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 				}
 			}
 			if !required {
-				return nil, errors.New(fmt.Sprintf("if field '%s' is filled you need to put value in %v field also", field, dependenciesField))
+				return nil, fmt.Errorf("if field '%s' is filled you need to put value in %v field also", field, dependenciesField)
 			}
 		}
 	}
@@ -288,7 +302,11 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 	return res, nil
 }
 
-func validate(field string, dataTemp map[string]interface{}, validator Rules, dataFrom loadFromType) (interface{}, error) {
+func validateInterface(dataTemp interface{}, validator Rules, dataFrom loadFromType) (interface{}, error) {
+	panic("not implemented")
+}
+
+func validateMapInterface(field string, dataTemp map[string]interface{}, validator Rules, dataFrom loadFromType) (interface{}, error) {
 	//var oldIntType reflect.Kind
 	data := dataTemp[field]
 	var sliceData []interface{}
@@ -393,7 +411,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 					values = append(values, int(enumValue.Index(i).Int()))
 				}
 				if !valueInList[int](values, data.(int), isEqualInt) {
-					return nil, errors.New(fmt.Sprintf("the field '%s' value is not in enum list%v", field, values))
+					return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
 				}
 			case reflect.Int64:
 				var values []int64
@@ -401,7 +419,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 					values = append(values, enumValue.Index(i).Int())
 				}
 				if !valueInList[int64](values, data.(int64), isEqualInt64) {
-					return nil, errors.New(fmt.Sprintf("the field '%s' value is not in enum list%v", field, values))
+					return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
 				}
 			case reflect.Float64:
 				var values []float64
@@ -409,7 +427,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 					values = append(values, enumValue.Index(i).Float())
 				}
 				if !valueInList[float64](values, data.(float64), isEqualFloat64) {
-					return nil, errors.New(fmt.Sprintf("the field '%s' value is not in enum list%v", field, values))
+					return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
 				}
 			case reflect.String:
 				var values []string
@@ -417,7 +435,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 					values = append(values, enumValue.Index(i).String())
 				}
 				if !valueInList[string](values, data.(string), isEqualString) {
-					return nil, errors.New(fmt.Sprintf("the field '%s' value is not in enum list%v", field, values))
+					return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
 				}
 			default:
 				panic("not support type validatorType for enum value")
@@ -541,7 +559,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	if validator.Min != nil && data != nil {
 		var isErr bool
 		var actualLength int64
-		err := errors.New(fmt.Sprintf("the field '%s' should be or greater than %v", field, *validator.Min))
+		err := fmt.Errorf("the field '%s' should be or greater than %v", field, *validator.Min)
 		if reflect.String == dataType {
 			if total := utf8.RuneCountInString(data.(string)); int64(total) < *validator.Min {
 				isErr = true
@@ -577,7 +595,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	if validator.Max != nil && data != nil {
 		var isErr bool
 		var actualLength int64
-		err := errors.New(fmt.Sprintf("the field '%s' should be or lower than %v", field, *validator.Max))
+		err := fmt.Errorf("the field '%s' should be or lower than %v", field, *validator.Max)
 		if reflect.String == dataType {
 			if total := utf8.RuneCountInString(data.(string)); int64(total) > *validator.Max {
 				isErr = true

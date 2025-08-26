@@ -94,6 +94,6 @@ func (rw *rulesWrapper) getManipulator() []manipulator {
 	return rw.manipulator
 }
 
-func (rw *rulesWrapper) Done() rulesWrapper {
-	return *rw
+func (rw *rulesWrapper) isList() bool {
+	return rw.isListRules
 }
