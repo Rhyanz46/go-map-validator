@@ -62,6 +62,100 @@ func TestInvalidWordingList(t *testing.T) {
 	}
 }
 
+func TestValidContentLenghtList(t *testing.T) {
+	payload := map[string]interface{}{
+		"tags":    []string{"RED", "BLUE"},
+		"numbers": []int{10, 20, 30, 40, 50, 60, 11},
+	}
+
+	rules := map_validator.BuildRoles().
+		SetRule("tags", map_validator.Rules{
+			List: map_validator.BuildListRoles(),
+			Enum: &map_validator.EnumField[any]{
+				Items: []string{"GREEN", "BLUE", "RED"}},
+			Max: map_validator.SetTotal(5)},
+		).
+		SetRule("numbers", map_validator.Rules{List: map_validator.BuildListRoles().SetListRule(map_validator.ListRules{
+			Min: map_validator.SetTotal(10), Max: map_validator.SetTotal(100),
+		}), Type: reflect.Int, Max: map_validator.SetTotal(7)})
+
+	op, err := map_validator.NewValidateBuilder().SetRules(rules).Load(payload)
+	if err != nil {
+		t.Fatalf("Load error: %s", err)
+	}
+
+	_, err = op.RunValidate()
+	if err != nil {
+		t.Errorf("Expected not error, but got error %s", err)
+	}
+}
+
+func TestInvalidItemContentLenghtList(t *testing.T) {
+	payload := map[string]interface{}{
+		"tags":    []string{"RED", "BLUE"},
+		"numbers": []int{10, 20, 30, 40, 50, 60, 2},
+	}
+
+	rules := map_validator.BuildRoles().
+		SetRule("tags", map_validator.Rules{
+			List: map_validator.BuildListRoles(),
+			Enum: &map_validator.EnumField[any]{
+				Items: []string{"GREEN", "BLUE", "RED"}},
+			Max: map_validator.SetTotal(5)},
+		).
+		SetRule("numbers", map_validator.Rules{List: map_validator.BuildListRoles().SetListRule(map_validator.ListRules{
+			Min: map_validator.SetTotal(10), Max: map_validator.SetTotal(100),
+		}), Type: reflect.Int, Max: map_validator.SetTotal(7)})
+
+	op, err := map_validator.NewValidateBuilder().SetRules(rules).Load(payload)
+	if err != nil {
+		t.Fatalf("Load error: %s", err)
+	}
+
+	_, err = op.RunValidate()
+	if err == nil {
+		t.Errorf("Expected error, but got no error")
+	}
+
+	expectedError := "value in 'numbers' field should be or greater than 10"
+	if err != nil && err.Error() != expectedError {
+		t.Errorf("Expected error %s, but got: %s", expectedError, err)
+	}
+}
+
+func TestInvalidStringItemContentLenghtList(t *testing.T) {
+	payload := map[string]interface{}{
+		"name":    []string{"messi", "ronaldo"},
+		"numbers": []int{10, 20, 30, 40, 50, 60, 12},
+	}
+
+	rules := map_validator.BuildRoles().
+		SetRule("name", map_validator.Rules{
+			List: map_validator.BuildListRoles().SetListRule(map_validator.ListRules{
+				Max: map_validator.SetTotal(3),
+			}),
+			Max: map_validator.SetTotal(5)},
+		).
+		SetRule("numbers", map_validator.Rules{List: map_validator.BuildListRoles().SetListRule(map_validator.ListRules{
+			Min: map_validator.SetTotal(10), Max: map_validator.SetTotal(100),
+		}), Type: reflect.Int, Max: map_validator.SetTotal(7)})
+
+	op, err := map_validator.NewValidateBuilder().SetRules(rules).Load(payload)
+	if err != nil {
+		t.Fatalf("Load error: %s", err)
+	}
+
+	_, err = op.RunValidate()
+	if err == nil {
+		t.Errorf("Expected error, but got no error")
+	}
+
+	expectedError := "value in 'name' field should be or lower than 3"
+	if err != nil && err.Error() != expectedError {
+		t.Errorf("Expected error %s, but got: %s", expectedError, err)
+	}
+}
+
 // // TestInvalidList a negative test case for the new "List" rule.
 // func TestInvalidList(t *testing.T) {
 // 	// Test case 1: Field is not a list

@@ -391,12 +391,12 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 		return nil, errors.New("the field '" + field + "' should be '" + validator.Type.String() + "'")
 	}
 
-	// Early list handling to avoid container-level regex/enum/type checks
-	if validator.List != nil {
-		sliceDataX, ok := toInterfaceSlice(data)
-		if !ok {
-			return nil, errors.New("field '" + field + "' is not valid list")
-		}
+    // Early list handling to avoid container-level regex/enum/type checks
+    if validator.List != nil {
+        sliceDataX, ok := toInterfaceSlice(data)
+        if !ok {
+            return nil, errors.New("field '" + field + "' is not valid list")
+        }
 
 		// List of objects via Object rules or legacy ListObject
 		if validator.Object != nil || validator.ListObject != nil {
@@ -411,24 +411,85 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 			return sliceDataX, nil
 		}
 
-		// Primitive list: validate each element
-		var hasExplicitListBounds bool
-		if lr, ok := validator.List.(*rulesWrapper); ok {
-			if lr.ListRules.Min != nil || lr.ListRules.Max != nil {
-				hasExplicitListBounds = true
-			}
-		}
-		for _, it := range sliceDataX {
-			tmpRule := validator
-			tmpRule.List = nil
-			tmpRule.ListObject = nil
-			tmpRule.Object = nil
-			// restore element type for per-item validation
-			tmpRule.Type = originalElementKind
-			if !hasExplicitListBounds && validator.Min != nil && validator.Max != nil {
-				tmpRule.Min = nil
-				tmpRule.Max = nil
-			}
+        // Primitive list: validate each element
+        var elementMinPtr, elementMaxPtr *int64
+        if lr, ok := validator.List.(*rulesWrapper); ok {
+            // Treat ListRules.Min/Max as element content length constraints (string only)
+            elementMinPtr = lr.ListRules.Min
+            elementMaxPtr = lr.ListRules.Max
+        }
+        for _, it := range sliceDataX {
+            tmpRule := validator
+            tmpRule.List = nil
+            tmpRule.ListObject = nil
+            tmpRule.Object = nil
+            // restore element type for per-item validation
+            tmpRule.Type = originalElementKind
+            // By default, do not carry container Min/Max into element checks
+            tmpRule.Min = nil
+            tmpRule.Max = nil
+            // Apply element content constraints (pre-check) for string and numeric elements
+            if it != nil {
+                gotKind := reflect.TypeOf(it).Kind()
+                // Resolve effective element kind: explicit Type if provided, else infer from value
+                effectiveKind := originalElementKind
+                if effectiveKind == reflect.Invalid {
+                    effectiveKind = gotKind
+                }
+                // String length constraints
+                if effectiveKind == reflect.String && gotKind == reflect.String {
+                    if elementMinPtr != nil {
+                        if int64(utf8.RuneCountInString(it.(string))) < *elementMinPtr {
+                            return nil, fmt.Errorf("value in '%s' field should be or greater than %v", field, *elementMinPtr)
+                        }
+                    }
+                    if elementMaxPtr != nil {
+                        if int64(utf8.RuneCountInString(it.(string))) > *elementMaxPtr {
+                            return nil, fmt.Errorf("value in '%s' field should be or lower than %v", field, *elementMaxPtr)
+                        }
+                    }
+                }
+                // Numeric value constraints
+                if isIntegerFamily(effectiveKind) && isIntegerFamily(gotKind) {
+                    // normalize to float64 for comparison
+                    var num float64
+                    switch v := it.(type) {
+                    case int:
+                        num = float64(v)
+                    case int8:
+                        num = float64(v)
+                    case int16:
+                        num = float64(v)
+                    case int32:
+                        num = float64(v)
+                    case int64:
+                        num = float64(v)
+                    case uint:
+                        num = float64(v)
+                    case uint8:
+                        num = float64(v)
+                    case uint16:
+                        num = float64(v)
+                    case uint32:
+                        num = float64(v)
+                    case uint64:
+                        num = float64(v)
+                    case float32:
+                        num = float64(v)
+                    case float64:
+                        num = v
+                    default:
+                        // fallback: let validate handle
+                        num = 0
+                    }
+                    if elementMinPtr != nil && num < float64(*elementMinPtr) {
+                        return nil, fmt.Errorf("value in '%s' field should be or greater than %v", field, *elementMinPtr)
+                    }
+                    if elementMaxPtr != nil && num > float64(*elementMaxPtr) {
+                        return nil, fmt.Errorf("value in '%s' field should be or lower than %v", field, *elementMaxPtr)
+                    }
+                }
+            }
 			// Pre-check element type mismatch to craft a clearer wording
 			// Only when element Type is explicitly set (avoid interfering with Enum/UUID/Regex-only rules)
 			if it != nil && tmpRule.Type != reflect.Invalid {
@@ -450,23 +511,19 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 				return nil, err
 			}
 		}
-		// list-size Min/Max: prefer ListRules if provided, else both Min+Max
-		var minPtr, maxPtr *int64
-		if lr, ok := validator.List.(*rulesWrapper); ok {
-			minPtr = lr.ListRules.Min
-			maxPtr = lr.ListRules.Max
-		}
-		if minPtr == nil && validator.Min != nil && validator.Max != nil {
-			minPtr = validator.Min
-		}
-		if maxPtr == nil && validator.Min != nil && validator.Max != nil {
-			maxPtr = validator.Max
-		}
-		listLen := int64(len(sliceDataX))
-		if minPtr != nil && listLen < *minPtr {
-			return nil, fmt.Errorf("the field '%s' should be or greater than %v", field, *minPtr)
-		}
-		if maxPtr != nil && listLen > *maxPtr {
+        // list-size Min/Max come from outer rule (container size)
+        var minPtr, maxPtr *int64
+        if validator.Min != nil {
+            minPtr = validator.Min
+        }
+        if validator.Max != nil {
+            maxPtr = validator.Max
+        }
+        listLen := int64(len(sliceDataX))
+        if minPtr != nil && listLen < *minPtr {
+            return nil, fmt.Errorf("the field '%s' should be or greater than %v", field, *minPtr)
+        }
+        if maxPtr != nil && listLen > *maxPtr {
 			return nil, fmt.Errorf("the field '%s' should be or lower than %v", field, *maxPtr)
 		}
 		return sliceDataX, nil
