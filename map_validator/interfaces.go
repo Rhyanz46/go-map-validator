@@ -74,9 +74,6 @@ type ChainerType interface {
 // RulesWrapper defines public methods for rulesWrapper
 type RulesWrapper interface {
 	getRules() map[string]Rules
-	// SetRules(rules map[string]Rules) RulesWrapper
-
-	// GetRule() Rules
 	SetRule(field string, rule Rules) RulesWrapper
 
 	getSetting() Setting
