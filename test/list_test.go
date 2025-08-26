@@ -32,6 +32,36 @@ func TestValidList(t *testing.T) {
 	}
 }
 
+func TestInvalidWordingList(t *testing.T) {
+	payload := map[string]interface{}{
+		"tags":       []string{"RED", "BLUE"},
+		"user_ids":   []string{"6ba7b810-9dad-11d1-80b4-00c04fd430c8", "6ba7b811-9dad-11d1-80b4-00c04fd430c8"},
+		"numbers":    []string{"satu", "dua", "tiga"},
+		"empty_list": []string{},
+	}
+
+	rules := map_validator.BuildRoles().
+		SetRule("tags", map_validator.Rules{List: map_validator.BuildListRoles(), Enum: &map_validator.EnumField[any]{Items: []string{"GREEN", "BLUE", "RED"}}, Max: map_validator.SetTotal(5)}).
+		SetRule("user_ids", map_validator.Rules{List: map_validator.BuildListRoles(), UUID: true}).
+		SetRule("numbers", map_validator.Rules{List: map_validator.BuildListRoles(), Type: reflect.Int, Min: map_validator.SetTotal(3)}).
+		SetRule("empty_list", map_validator.Rules{List: map_validator.BuildListRoles(), Type: reflect.String})
+
+	op, err := map_validator.NewValidateBuilder().SetRules(rules).Load(payload)
+	if err != nil {
+		t.Fatalf("Load error: %s", err)
+	}
+
+	_, err = op.RunValidate()
+	if err == nil {
+		t.Error("Expected error, but got no error")
+	}
+
+	expectedError := "value in 'numbers' field should be integer"
+	if err != nil && err.Error() != expectedError {
+		t.Errorf("Expected error %s, but got: %s", expectedError, err)
+	}
+}
+
 // // TestInvalidList a negative test case for the new "List" rule.
 // func TestInvalidList(t *testing.T) {
 // 	// Test case 1: Field is not a list

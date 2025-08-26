@@ -429,6 +429,22 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 				tmpRule.Min = nil
 				tmpRule.Max = nil
 			}
+			// Pre-check element type mismatch to craft a clearer wording
+			// Only when element Type is explicitly set (avoid interfering with Enum/UUID/Regex-only rules)
+			if it != nil && tmpRule.Type != reflect.Invalid {
+				gotKind := reflect.TypeOf(it).Kind()
+				expectedKind := tmpRule.Type
+				allowIntCoerce := (dataFrom == fromHttpJson || dataFrom == fromJSONEncoder) && isIntegerFamily(expectedKind) && isIntegerFamily(gotKind)
+				if gotKind != expectedKind && !allowIntCoerce {
+					// Map kind to human-friendly noun (e.g., int/uint/float -> integer)
+					noun := expectedKind.String()
+					if isIntegerFamily(expectedKind) {
+						noun = "integer"
+					}
+					return nil, fmt.Errorf("value in '%s' field should be %s", field, noun)
+				}
+			}
+
 			tmpPayload := map[string]interface{}{field: it}
 			if _, err := validate(field, tmpPayload, tmpRule, dataFrom); err != nil {
 				return nil, err
