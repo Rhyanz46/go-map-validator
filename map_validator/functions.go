@@ -124,14 +124,14 @@ func buildMessage(msg string, meta MessageMeta) error {
 	return errors.New(msg)
 }
 
-func validateRecursive(pChain ChainerType, wrapper *RulesWrapper, key string, data map[string]interface{}, rule Rules, loadedFrom loadFromType) (interface{}, error) {
+func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, data map[string]interface{}, rule Rules, loadedFrom loadFromType) (interface{}, error) {
 	//child and parent chain
 	cChain := pChain.AddChild().SetKey(key)
 	var endOfLoop bool
-	if wrapper != nil && wrapper.Setting.Strict {
+	if wrapper != nil && wrapper.getSetting().Strict {
 		var allowedKeys []string
 		keys := getAllKeys(data)
-		for XKey, _ := range wrapper.Rules {
+		for XKey, _ := range wrapper.getRules() {
 			allowedKeys = append(allowedKeys, XKey)
 		}
 		for _, XKey := range keys {
@@ -162,24 +162,24 @@ func validateRecursive(pChain ChainerType, wrapper *RulesWrapper, key string, da
 		}
 
 		// put filled and null fields
-		if wrapper.filledField == nil {
-			wrapper.filledField = &[]string{}
+		if wrapper.getFilledField() == nil {
+			wrapper.setFilledField(&[]string{})
 		}
-		if wrapper.nullFields == nil {
-			wrapper.nullFields = &[]string{}
+		if wrapper.getNullFields() == nil {
+			wrapper.setNullFields(&[]string{})
 		}
 
 		if res != nil {
-			*wrapper.filledField = append(*wrapper.filledField, key)
+			wrapper.appendFilledField(key)
 		} else {
-			*wrapper.nullFields = append(*wrapper.nullFields, key)
+			wrapper.appendNullFields(key)
 		}
 
-		if len(wrapper.Rules) == len(*wrapper.nullFields)+len(*wrapper.filledField) {
+		if len(wrapper.getRules()) == len(*wrapper.getNullFields())+len(*wrapper.getFilledField()) {
 			endOfLoop = true
 		}
 
-		for _, mptr := range wrapper.manipulator {
+		for _, mptr := range wrapper.getManipulator() {
 			if key == mptr.Field {
 				cChain.SetManipulator(mptr.Func)
 			}
@@ -189,26 +189,26 @@ func validateRecursive(pChain ChainerType, wrapper *RulesWrapper, key string, da
 	// put required without values
 	if wrapper != nil && len(rule.RequiredWithout) > 0 {
 		for _, unique := range rule.RequiredWithout {
-			if wrapper.requiredWithout == nil {
-				wrapper.requiredWithout = &map[string][]string{}
+			if wrapper.getRequiredWithout() == nil {
+				wrapper.setRequiredWithout(&map[string][]string{})
 			}
 
-			if _, exists := (*wrapper.requiredWithout)[unique]; !exists {
-				(*wrapper.requiredWithout)[unique] = []string{}
+			if _, exists := (*wrapper.getRequiredWithout())[unique]; !exists {
+				(*wrapper.getRequiredWithout())[unique] = []string{}
 			}
-			(*wrapper.requiredWithout)[unique] = append((*wrapper.requiredWithout)[unique], key)
+			(*wrapper.getRequiredWithout())[unique] = append((*wrapper.getRequiredWithout())[unique], key)
 		}
 	}
 
-	if endOfLoop && wrapper != nil && wrapper.requiredWithout != nil {
-		for _, field := range *wrapper.nullFields {
+	if endOfLoop && wrapper != nil && wrapper.getRequiredWithout() != nil {
+		for _, field := range *wrapper.getNullFields() {
 			var required bool
-			dependenciesField := (*wrapper.requiredWithout)[field]
+			dependenciesField := (*wrapper.getRequiredWithout())[field]
 			if len(dependenciesField) == 0 {
 				continue
 			}
 			for _, XField := range dependenciesField {
-				if isDataInList(XField, *wrapper.filledField) {
+				if isDataInList(XField, *wrapper.getFilledField()) {
 					required = true
 				}
 			}
@@ -221,26 +221,26 @@ func validateRecursive(pChain ChainerType, wrapper *RulesWrapper, key string, da
 	// put required if values
 	if wrapper != nil && len(rule.RequiredIf) > 0 {
 		for _, unique := range rule.RequiredIf {
-			if wrapper.requiredIf == nil {
-				wrapper.requiredIf = &map[string][]string{}
+			if wrapper.getRequiredIf() == nil {
+				wrapper.setRequiredIf(&map[string][]string{})
 			}
 
-			if _, exists := (*wrapper.requiredIf)[unique]; !exists {
-				(*wrapper.requiredIf)[unique] = []string{}
+			if _, exists := (*wrapper.getRequiredIf())[unique]; !exists {
+				(*wrapper.getRequiredIf())[unique] = []string{}
 			}
-			(*wrapper.requiredIf)[unique] = append((*wrapper.requiredIf)[unique], key)
+			(*wrapper.getRequiredIf())[unique] = append((*wrapper.getRequiredIf())[unique], key)
 		}
 	}
 
-	if endOfLoop && wrapper != nil && wrapper.requiredIf != nil {
-		for _, field := range *wrapper.filledField {
+	if endOfLoop && wrapper != nil && wrapper.getRequiredIf() != nil {
+		for _, field := range *wrapper.getFilledField() {
 			var required bool
-			dependenciesField := (*wrapper.requiredIf)[field]
+			dependenciesField := (*wrapper.getRequiredIf())[field]
 			if len(dependenciesField) == 0 {
 				continue
 			}
 			for _, XField := range dependenciesField {
-				if !isDataInList(XField, *wrapper.nullFields) {
+				if !isDataInList(XField, *wrapper.getNullFields()) {
 					required = true
 				}
 			}
@@ -252,7 +252,7 @@ func validateRecursive(pChain ChainerType, wrapper *RulesWrapper, key string, da
 
 	// if list
 	if rule.Object != nil && res != nil {
-		for keyX, ruleX := range rule.Object.Rules {
+		for keyX, ruleX := range rule.Object.getRules() {
 			_, err = validateRecursive(cChain, rule.Object, keyX, res.(map[string]interface{}), ruleX, fromJSONEncoder)
 			if err != nil {
 				return nil, err
@@ -265,7 +265,7 @@ func validateRecursive(pChain ChainerType, wrapper *RulesWrapper, key string, da
 		var manipulated []interface{}
 		for _, xRes := range listRes {
 			tmpChain := newChainer().SetKey(chainKey)
-			for keyX, ruleX := range rule.ListObject.Rules {
+			for keyX, ruleX := range rule.ListObject.getRules() {
 				_, err = validateRecursive(tmpChain, rule.ListObject, keyX, xRes.(map[string]interface{}), ruleX, fromJSONEncoder)
 				if err != nil {
 					return nil, err
@@ -275,7 +275,7 @@ func validateRecursive(pChain ChainerType, wrapper *RulesWrapper, key string, da
 			// ensure only fields defined in ListObject rules are included
 			itemMapFull := tmpChain.GetResult().ToMap()
 			filtered := make(map[string]interface{})
-			for keyAllowed := range rule.ListObject.Rules {
+			for keyAllowed := range rule.ListObject.getRules() {
 				if val, ok := itemMapFull[keyAllowed]; ok {
 					filtered[keyAllowed] = val
 				}

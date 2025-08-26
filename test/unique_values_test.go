@@ -1,18 +1,17 @@
 package test
 
 import (
-	"github.com/Rhyanz46/go-map-validator/map_validator"
 	"reflect"
 	"testing"
+
+	"github.com/Rhyanz46/go-map-validator/map_validator"
 )
 
 func TestUniqueValue(t *testing.T) {
-	role := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"password":     {Type: reflect.String, Null: true},
-			"new_password": {Type: reflect.String, Unique: []string{"password"}, Null: true},
-		},
-	}
+	role := map_validator.BuildRoles().
+		SetRule("password", map_validator.Rules{Type: reflect.String, Null: true}).
+		SetRule("new_password", map_validator.Rules{Type: reflect.String, Unique: []string{"password"}, Null: true})
+
 	payload := map[string]interface{}{
 		"password":     "sabalong",
 		"new_password": "sabalong",
@@ -34,18 +33,14 @@ func TestUniqueValue(t *testing.T) {
 }
 
 func TestUniqueValueInNested(t *testing.T) {
-	role := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"password":     {Type: reflect.String, Null: true},
-			"new_password": {Type: reflect.String, Unique: []string{"password"}, Null: true},
-			"data": {Object: &map_validator.RulesWrapper{
-				Rules: map[string]map_validator.Rules{
-					"dt_password":     {Type: reflect.String, Null: true},
-					"dt_new_password": {Type: reflect.String, Unique: []string{"password"}, Null: true},
-				},
-			}},
-		},
-	}
+	roleChild := map_validator.BuildRoles().
+		SetRule("dt_password", map_validator.Rules{Type: reflect.String, Null: true}).
+		SetRule("dt_new_password", map_validator.Rules{Type: reflect.String, Unique: []string{"password"}, Null: true})
+	role := map_validator.BuildRoles().
+		SetRule("password", map_validator.Rules{Type: reflect.String, Null: true}).
+		SetRule("new_password", map_validator.Rules{Type: reflect.String, Unique: []string{"password"}, Null: true}).
+		SetRule("data", map_validator.Rules{Object: roleChild})
+
 	payload := map[string]interface{}{
 		"password":     "sabalong",
 		"new_password": "sabalong",
@@ -71,12 +66,10 @@ func TestUniqueValueInNested(t *testing.T) {
 }
 
 func TestNonUniqueValue(t *testing.T) {
-	role := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"password":     {Type: reflect.String, Null: true},
-			"new_password": {Type: reflect.String, Unique: []string{"password"}, Null: true},
-		},
-	}
+	role := map_validator.BuildRoles().
+		SetRule("password", map_validator.Rules{Type: reflect.String, Null: true}).
+		SetRule("new_password", map_validator.Rules{Type: reflect.String, Unique: []string{"password"}, Null: true})
+
 	payload := map[string]interface{}{
 		"password":     "sabalong",
 		"new_password": "sabalong",
@@ -94,17 +87,13 @@ func TestNonUniqueValue(t *testing.T) {
 }
 
 func TestChildUniqueValue(t *testing.T) {
-	role := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"data": {Object: &map_validator.RulesWrapper{
-				Rules: map[string]map_validator.Rules{
-					"name":         {Type: reflect.String, Null: true},
-					"password":     {Type: reflect.String, Null: true},
-					"new_password": {Type: reflect.String, Unique: []string{"password"}, Null: true},
-				},
-			}},
-		},
-	}
+	roleChild := map_validator.BuildRoles().
+		SetRule("name", map_validator.Rules{Type: reflect.String, Null: true}).
+		SetRule("password", map_validator.Rules{Type: reflect.String, Null: true}).
+		SetRule("new_password", map_validator.Rules{Type: reflect.String, Unique: []string{"password"}, Null: true})
+
+	role := map_validator.BuildRoles().
+		SetRule("data", map_validator.Rules{Object: roleChild})
 	payload := map[string]interface{}{
 		"data": map[string]interface{}{
 			"password":     "sabalong",
@@ -125,14 +114,11 @@ func TestChildUniqueValue(t *testing.T) {
 }
 
 func TestUniqueManyValue(t *testing.T) {
-	role := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"name":         {Type: reflect.String, Unique: []string{"basic", "password", "new_password"}, Null: true},
-			"hoby":         {Type: reflect.String, Unique: []string{"basic"}, Null: true},
-			"password":     {Type: reflect.String, Null: true},
-			"new_password": {Type: reflect.String, Unique: []string{"password"}, Null: true},
-		},
-	}
+	role := map_validator.BuildRoles().
+		SetRule("name", map_validator.Rules{Type: reflect.String, Unique: []string{"basic", "password", "new_password"}, Null: true}).
+		SetRule("hoby", map_validator.Rules{Type: reflect.String, Unique: []string{"basic"}, Null: true}).
+		SetRule("password", map_validator.Rules{Type: reflect.String, Null: true}).
+		SetRule("new_password", map_validator.Rules{Type: reflect.String, Unique: []string{"password"}, Null: true})
 	payload := map[string]interface{}{
 		"name":         "sabalong_samalewa",
 		"hoby":         "hoby",
@@ -153,22 +139,17 @@ func TestUniqueManyValue(t *testing.T) {
 }
 
 func TestChildUniqueValueWithCustomMsg(t *testing.T) {
-	role := map_validator.RulesWrapper{
-		Rules: map[string]map_validator.Rules{
-			"data": {Object: &map_validator.RulesWrapper{
-				Rules: map[string]map_validator.Rules{
-					"name":     {Type: reflect.String, Null: true},
-					"password": {Type: reflect.String, Null: true},
-					"new_password": {
-						Type: reflect.String, Unique: []string{"password"}, Null: true,
-						CustomMsg: map_validator.CustomMsg{
-							OnUnique: map_validator.SetMessage("Nilai dari '${unique_origin}' tidak boleh sama dengan nilai '${unique_target}'"),
-						},
-					},
-				},
-			}},
-		},
-	}
+	roleChild := map_validator.BuildRoles().
+		SetRule("name", map_validator.Rules{Type: reflect.String, Null: true}).
+		SetRule("password", map_validator.Rules{Type: reflect.String, Null: true}).
+		SetRule("new_password", map_validator.Rules{
+			Type: reflect.String, Unique: []string{"password"}, Null: true,
+			CustomMsg: map_validator.CustomMsg{
+				OnUnique: map_validator.SetMessage("Nilai dari '${unique_origin}' tidak boleh sama dengan nilai '${unique_target}'"),
+			},
+		})
+	role := map_validator.BuildRoles().
+		SetRule("data", map_validator.Rules{Object: roleChild})
 	payload := map[string]interface{}{
 		"data": map[string]interface{}{
 			"password":     "sabalong",
