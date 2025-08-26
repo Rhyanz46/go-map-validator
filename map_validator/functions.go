@@ -147,16 +147,9 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 		}
 	}
 
-	if rule.isList() {
-		res, err = validateInterface(data, rule, loadedFrom)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		res, err = validateMapInterface(key, data, rule, loadedFrom)
-		if err != nil {
-			return nil, err
-		}
+	res, err = validate(key, data, rule, loadedFrom)
+	if err != nil {
+		return nil, err
 	}
 
 	if res != nil {
@@ -277,23 +270,36 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 		listRes := res.([]interface{})
 		var manipulated []interface{}
 		for _, xRes := range listRes {
-			tmpChain := newChainer().SetKey(chainKey)
-			for keyX, ruleX := range rule.ListObject.getRules() {
-				_, err = validateRecursive(tmpChain, rule.ListObject, keyX, xRes.(map[string]interface{}), ruleX, fromJSONEncoder)
-				if err != nil {
+			if m, ok := xRes.(map[string]interface{}); ok {
+				// Validate as object with the provided child rules
+				tmpChain := newChainer().SetKey(chainKey)
+				for keyX, ruleX := range rule.ListObject.getRules() {
+					_, err = validateRecursive(tmpChain, rule.ListObject, keyX, m, ruleX, fromJSONEncoder)
+					if err != nil {
+						return nil, err
+					}
+				}
+				// collect validated/manipulated item data back into the slice
+				itemMapFull := tmpChain.GetResult().ToMap()
+				filtered := make(map[string]interface{})
+				for keyAllowed := range rule.ListObject.getRules() {
+					if val, ok := itemMapFull[keyAllowed]; ok {
+						filtered[keyAllowed] = val
+					}
+				}
+				manipulated = append(manipulated, filtered)
+			} else {
+				// Fallback: treat as primitive element; validate against parent rule flags (e.g., UUID, Email)
+				tmpRule := rule
+				tmpRule.Object = nil
+				tmpRule.ListObject = nil
+				tmpRule.List = nil
+				tmpPayload := map[string]interface{}{key: xRes}
+				if _, err := validate(key, tmpPayload, tmpRule, fromJSONEncoder); err != nil {
 					return nil, err
 				}
+				manipulated = append(manipulated, xRes)
 			}
-			// collect validated/manipulated item data back into the slice
-			// ensure only fields defined in ListObject rules are included
-			itemMapFull := tmpChain.GetResult().ToMap()
-			filtered := make(map[string]interface{})
-			for keyAllowed := range rule.ListObject.getRules() {
-				if val, ok := itemMapFull[keyAllowed]; ok {
-					filtered[keyAllowed] = val
-				}
-			}
-			manipulated = append(manipulated, filtered)
 		}
 		cChain.SetValue(manipulated)
 	}
@@ -301,11 +307,8 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 	return res, nil
 }
 
-func validateInterface(dataTemp interface{}, validator Rules, dataFrom loadFromType) (interface{}, error) {
-	panic("not implemented")
-}
-
-func validateMapInterface(field string, dataTemp map[string]interface{}, validator Rules, dataFrom loadFromType) (interface{}, error) {
+// validate is the core field validator used across the package and tests
+func validate(field string, dataTemp map[string]interface{}, validator Rules, dataFrom loadFromType) (interface{}, error) {
 	//var oldIntType reflect.Kind
 	data := dataTemp[field]
 	var sliceData []interface{}
@@ -335,6 +338,23 @@ func validateMapInterface(field string, dataTemp map[string]interface{}, validat
 	//	}
 	//	return res, nil
 	//}
+
+	// Keep original element-kind before any normalization
+	originalElementKind := validator.Type
+
+	// Pre-normalize list types to slice kind
+	if validator.ListObject != nil || validator.List != nil {
+		validator.Type = reflect.Slice
+	}
+
+	// Support legacy ListObject when List is not provided: enforce slice and return elements
+	if validator.ListObject != nil && validator.List == nil {
+		s, ok := toInterfaceSlice(data)
+		if !ok {
+			return nil, errors.New("field '" + field + "' is not valid list object")
+		}
+		return s, nil
+	}
 
 	// validatorType type validation
 	dataType := reflect.TypeOf(data).Kind()
@@ -369,6 +389,71 @@ func validateMapInterface(field string, dataTemp map[string]interface{}, validat
 			})
 		}
 		return nil, errors.New("the field '" + field + "' should be '" + validator.Type.String() + "'")
+	}
+
+	// Early list handling to avoid container-level regex/enum/type checks
+	if validator.List != nil {
+		sliceDataX, ok := toInterfaceSlice(data)
+		if !ok {
+			return nil, errors.New("field '" + field + "' is not valid list")
+		}
+
+		// List of objects via Object rules or legacy ListObject
+		if validator.Object != nil || validator.ListObject != nil {
+			// ensure elements are objects for Object rules
+			if validator.Object != nil {
+				for _, it := range sliceDataX {
+					if _, ok := it.(map[string]interface{}); !ok {
+						return nil, errors.New("field '" + field + "' is not valid list object")
+					}
+				}
+			}
+			return sliceDataX, nil
+		}
+
+		// Primitive list: validate each element
+		var hasExplicitListBounds bool
+		if lr, ok := validator.List.(*rulesWrapper); ok {
+			if lr.ListRules.Min != nil || lr.ListRules.Max != nil {
+				hasExplicitListBounds = true
+			}
+		}
+		for _, it := range sliceDataX {
+			tmpRule := validator
+			tmpRule.List = nil
+			tmpRule.ListObject = nil
+			tmpRule.Object = nil
+			// restore element type for per-item validation
+			tmpRule.Type = originalElementKind
+			if !hasExplicitListBounds && validator.Min != nil && validator.Max != nil {
+				tmpRule.Min = nil
+				tmpRule.Max = nil
+			}
+			tmpPayload := map[string]interface{}{field: it}
+			if _, err := validate(field, tmpPayload, tmpRule, dataFrom); err != nil {
+				return nil, err
+			}
+		}
+		// list-size Min/Max: prefer ListRules if provided, else both Min+Max
+		var minPtr, maxPtr *int64
+		if lr, ok := validator.List.(*rulesWrapper); ok {
+			minPtr = lr.ListRules.Min
+			maxPtr = lr.ListRules.Max
+		}
+		if minPtr == nil && validator.Min != nil && validator.Max != nil {
+			minPtr = validator.Min
+		}
+		if maxPtr == nil && validator.Min != nil && validator.Max != nil {
+			maxPtr = validator.Max
+		}
+		listLen := int64(len(sliceDataX))
+		if minPtr != nil && listLen < *minPtr {
+			return nil, fmt.Errorf("the field '%s' should be or greater than %v", field, *minPtr)
+		}
+		if maxPtr != nil && listLen > *maxPtr {
+			return nil, fmt.Errorf("the field '%s' should be or lower than %v", field, *maxPtr)
+		}
+		return sliceDataX, nil
 	}
 
 	if validator.File {
@@ -529,30 +614,20 @@ func validateMapInterface(field string, dataTemp map[string]interface{}, validat
 		return false, nil
 	}
 
-	if validator.ListObject != nil {
-		validator.Type = reflect.Slice
-	}
-
-	if validator.Type == reflect.Slice {
-		sliceDataX, ok := toInterfaceSlice(data)
-		if validator.ListObject != nil {
-			if !ok {
-				return nil, errors.New("field '" + field + "' is not valid list object")
-			}
-		}
-		if !ok {
-			return nil, errors.New("field '" + field + "' is not valid list")
-		}
-		sliceData = sliceDataX
-		data = sliceDataX
-	}
-
+	// legacy ListObject fallback occurs via early list handling
 	if validator.AnonymousObject || validator.Object != nil {
 		res, err := toMapStringInterface(data)
 		if err != nil {
 			return nil, errors.New("field '" + field + "' is not valid object")
 		}
 		return res, nil
+	}
+
+	// Ensure sliceData is available for legacy slice length checks
+	if sliceData == nil && data != nil && reflect.TypeOf(data).Kind() == reflect.Slice {
+		if s, ok := toInterfaceSlice(data); ok {
+			sliceData = s
+		}
 	}
 
 	if validator.Min != nil && data != nil {

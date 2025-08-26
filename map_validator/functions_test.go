@@ -15,7 +15,7 @@ func TestValidateUUID(t *testing.T) {
 		Null: false,
 	}
 
-	_, err := validateMapInterface("field1", payload, validator, fromHttpJson)
+	_, err := validate("field1", payload, validator, fromHttpJson)
 
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
@@ -32,7 +32,7 @@ func TestValidateInvalidUUID(t *testing.T) {
 		Null: false,
 	}
 
-	_, err := validateMapInterface("field1", payload, validator, fromHttpJson)
+	_, err := validate("field1", payload, validator, fromHttpJson)
 
 	if err == nil {
 		t.Errorf("Expected error, but got none")
@@ -54,7 +54,7 @@ func TestValidateNotNull(t *testing.T) {
 		Null: false,
 	}
 
-	_, err := validateMapInterface("field1", payload, validator, fromHttpJson)
+	_, err := validate("field1", payload, validator, fromHttpJson)
 
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
@@ -71,7 +71,7 @@ func TestValidateNullNotAllowed(t *testing.T) {
 		Null: false,
 	}
 
-	_, err := validateMapInterface("field1", payload, validator, fromHttpJson)
+	_, err := validate("field1", payload, validator, fromHttpJson)
 
 	if err == nil {
 		t.Errorf("Expected error, but got none")
@@ -93,7 +93,7 @@ func TestValidateStringMaxLength(t *testing.T) {
 		Max:  SetTotal(5),
 	}
 
-	_, err := validateMapInterface("field1", payload, validator, fromHttpJson)
+	_, err := validate("field1", payload, validator, fromHttpJson)
 
 	if err == nil {
 		t.Errorf("Expected error, but got none")
@@ -115,7 +115,7 @@ func TestValidateStringMinLength(t *testing.T) {
 		Min:  SetTotal(5),
 	}
 
-	_, err := validateMapInterface("field1", payload, validator, fromHttpJson)
+	_, err := validate("field1", payload, validator, fromHttpJson)
 
 	if err == nil {
 		t.Errorf("Expected error, but got none")
@@ -136,7 +136,7 @@ func TestValidateEmail(t *testing.T) {
 		Email: true,
 	}
 
-	_, err := validateMapInterface("email", payload, validator, fromHttpJson)
+	_, err := validate("email", payload, validator, fromHttpJson)
 
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
@@ -152,7 +152,7 @@ func TestValidateInvalidEmail(t *testing.T) {
 		Email: true,
 	}
 
-	_, err := validateMapInterface("email", payload, validator, fromHttpJson)
+	_, err := validate("email", payload, validator, fromHttpJson)
 
 	if err == nil {
 		t.Errorf("Expected error, but got none")
@@ -173,7 +173,7 @@ func TestValidateIPV4(t *testing.T) {
 		IPV4: true,
 	}
 
-	_, err := validateMapInterface("ip_address", payload, validator, fromHttpJson)
+	_, err := validate("ip_address", payload, validator, fromHttpJson)
 
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
@@ -189,7 +189,7 @@ func TestValidateInvalidIPV4(t *testing.T) {
 		IPV4: true,
 	}
 
-	_, err := validateMapInterface("ip_address", payload, validator, fromHttpJson)
+	_, err := validate("ip_address", payload, validator, fromHttpJson)
 
 	if err == nil {
 		t.Errorf("Expected error, but got none")
@@ -203,7 +203,7 @@ func TestValidateInvalidIPV4(t *testing.T) {
 
 func TestEnumFieldCheck(t *testing.T) {
 	payload := map[string]interface{}{"validatorType": "arian", "jenis_kelamin": "laki-laki", "hoby": "Main PS"}
-	_, err := validateMapInterface(
+	_, err := validate(
 		"validatorType", payload, Rules{
 			Null: false,
 			Enum: &EnumField[any]{Items: []string{"arian", "aaa"}},
@@ -213,7 +213,7 @@ func TestEnumFieldCheck(t *testing.T) {
 		t.Errorf("Test case 1 Error : %v", err)
 	}
 
-	_, err = validateMapInterface(
+	_, err = validate(
 		"jenis_kelamin", payload, Rules{
 			Null: false,
 			Enum: &EnumField[any]{Items: []string{"perempuan", "laki-laki"}},
@@ -223,7 +223,7 @@ func TestEnumFieldCheck(t *testing.T) {
 		t.Errorf("Test case 2 Error : %v", err)
 	}
 
-	_, err = validateMapInterface(
+	_, err = validate(
 		"jenis_kelamin", payload, Rules{
 			Null: false,
 			Enum: &EnumField[any]{Items: []string{"bola", "badminton", "renang"}},
@@ -237,7 +237,7 @@ func TestEnumFieldCheck(t *testing.T) {
 
 func TestIntFamily(t *testing.T) {
 	payload := map[string]interface{}{"umur": 1, "harga": 1.3}
-	_, err := validateMapInterface(
+	_, err := validate(
 		"umur", payload, Rules{
 			Type: reflect.Int,
 		}, fromMapString,
@@ -247,7 +247,7 @@ func TestIntFamily(t *testing.T) {
 	}
 
 	payload = map[string]interface{}{"umur": 1, "harga": 1.3}
-	_, err = validateMapInterface(
+	_, err = validate(
 		"umur", payload, Rules{
 			Type: reflect.Int,
 		}, fromHttpJson,
@@ -256,7 +256,7 @@ func TestIntFamily(t *testing.T) {
 		t.Errorf("Test case 1 Error : %v", err)
 	}
 
-	_, err = validateMapInterface(
+	_, err = validate(
 		"harga", payload, Rules{
 			Type: reflect.Float64,
 		}, fromHttpJson,
@@ -266,7 +266,7 @@ func TestIntFamily(t *testing.T) {
 	}
 
 	payload = map[string]interface{}{"power": 133.3, "harga": 1.3}
-	_, err = validateMapInterface(
+	_, err = validate(
 		"power", payload, Rules{
 			Type: reflect.Int,
 		}, fromHttpJson,
@@ -276,7 +276,7 @@ func TestIntFamily(t *testing.T) {
 	}
 
 	payload = map[string]interface{}{"power": 133.3, "harga": 1.3}
-	_, err = validateMapInterface(
+	_, err = validate(
 		"power", payload, Rules{
 			Type: reflect.Int16,
 		}, fromHttpJson,
@@ -286,7 +286,7 @@ func TestIntFamily(t *testing.T) {
 	}
 
 	payload = map[string]interface{}{"power": "133.3", "harga": 1.3}
-	_, err = validateMapInterface(
+	_, err = validate(
 		"power", payload, Rules{
 			Type: reflect.Int16,
 		}, fromHttpJson,
@@ -296,7 +296,7 @@ func TestIntFamily(t *testing.T) {
 		t.Errorf("Expected : %s But you got : %s", expected, err)
 	}
 
-	_, err = validateMapInterface(
+	_, err = validate(
 		"harga", payload, Rules{
 			Type: reflect.Float64,
 		}, fromHttpJson,
