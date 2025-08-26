@@ -135,7 +135,15 @@ Supported fields in `CustomMsg`:
 - `OnTypeNotMatch`, `OnRegexString`, `OnMin`, `OnMax`, `OnUnique`.
 
 Message variables:
-- `${field}`, `${expected_type}`, `${actual_type}`, `${actual_length}`, `${expected_min_length}`, `${expected_max_length}`, `${unique_origin}`, `${unique_target}`.
+
+- `${field}`: nama field yang divalidasi (key pada rules).
+- `${expected_type}`: tipe yang diharapkan (hasil `reflect.Kind.String()` dari rules).
+- `${actual_type}`: tipe aktual dari nilai yang diterima.
+- `${actual_length}`: panjang aktual (string: jumlah rune; angka: nilai numerik yang dibandingkan; slice: jumlah elemen).
+- `${expected_min_length}`: nilai/ukuran minimum yang diharapkan (`Min`).
+- `${expected_max_length}`: nilai/ukuran maksimum yang diharapkan (`Max`).
+- `${unique_origin}`: nama field asal pada pengecekan unik.
+- `${unique_target}`: nama field target yang dibandingkan pada pengecekan unik.
 
 ```go
 rules := map_validator.BuildRoles().
@@ -150,6 +158,46 @@ rules := map_validator.BuildRoles().
   }).
   Done()
 ```
+
+Examples:
+
+- Type mismatch
+```go
+rules := map_validator.BuildRoles().
+  SetRule("qty", map_validator.Rules{
+    Type: reflect.Int64,
+    CustomMsg: map_validator.CustomMsg{
+      OnTypeNotMatch: map_validator.SetMessage("Field ${field} must be ${expected_type}, but got ${actual_type}"),
+    },
+  }).
+  Done()
+```
+
+- Regex validation
+```go
+rules := map_validator.BuildRoles().
+  SetRule("email", map_validator.Rules{
+    RegexString: `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`,
+    CustomMsg:   map_validator.CustomMsg{OnRegexString: map_validator.SetMessage("Your ${field} is not a valid email")},
+  }).
+  Done()
+```
+
+- Unique across fields
+```go
+rules := map_validator.BuildRoles().
+  SetRule("password", map_validator.Rules{Type: reflect.String}).
+  SetRule("new_password", map_validator.Rules{
+    Type: reflect.String, Unique: []string{"password"},
+    CustomMsg: map_validator.CustomMsg{OnUnique: map_validator.SetMessage("The value of '${unique_origin}' must be different from '${unique_target}'")},
+  }).
+  Done()
+```
+
+Notes:
+- If a corresponding `CustomMsg` is not set, the default error message is used.
+- Variables are replaced contextually at error time (e.g., `${field}` is the rule’s key).
+- Currently not customizable: enum mismatch, null errors, and specific RequiredWithout/If messages.
 
 ## Manipulators (Post-process)
 
