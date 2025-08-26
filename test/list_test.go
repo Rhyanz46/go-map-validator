@@ -1,52 +1,167 @@
 package test
 
-// import (
-// 	"bytes"
-// 	"net/http/httptest"
-// 	"reflect"
-// 	"strings"
-// 	"testing"
+import (
+	"reflect"
+	"testing"
 
-// 	"github.com/Rhyanz46/go-map-validator/map_validator"
-// )
+	"github.com/Rhyanz46/go-map-validator/map_validator"
+)
 
 // // TestValidList a positive test case for the new "List" rule.
-// func TestValidList(t *testing.T) {
-// 	payload := map[string]interface{}{
-// 		"tags":       []string{"tag1", "tag2", "tag3"},
-// 		"user_ids":   []string{"6ba7b810-9dad-11d1-80b4-00c04fd430c8", "6ba7b811-9dad-11d1-80b4-00c04fd430c8"},
-// 		"numbers":    []int{10, 20, 30},
-// 		"empty_list": []string{},
-// 	}
+func TestValidList(t *testing.T) {
+	payload := map[string]interface{}{
+		"tags":       []string{"RED", "BLUE"},
+		"user_ids":   []string{"6ba7b810-9dad-11d1-80b4-00c04fd430c8", "6ba7b811-9dad-11d1-80b4-00c04fd430c8"},
+		"numbers":    []int{10, 20, 30},
+		"empty_list": []string{},
+	}
 
-// 	rules := map_validator.BuildRoles().
-// 		SetRule("tags", map_validator.Rules{List: true, Type: reflect.String, Max: map_validator.SetTotal(5)}).
-// 		SetRule("user_ids", map_validator.Rules{
-// 			ListObject: map_validator.BuildRoles().SetRule("tags", map_validator.Rules{
-// 				Type: reflect.String,
-// 				Max:  map_validator.SetTotal(5)}),
-// 			UUID: true}).
-// 		SetRule("numbers", map_validator.Rules{List: true, Type: reflect.Int, Min: map_validator.SetTotal(5)}).
-// 		SetRule("empty_list", map_validator.Rules{List: true, Type: reflect.String}).
-// 		Done()
+	rules := map_validator.BuildRoles().
+		SetRule("tags", map_validator.Rules{List: map_validator.BuildListRoles(), Enum: &map_validator.EnumField[any]{Items: []string{"GREEN", "BLUE", "RED"}}, Max: map_validator.SetTotal(5)}).
+		SetRule("user_ids", map_validator.Rules{List: map_validator.BuildListRoles(), UUID: true}).
+		SetRule("numbers", map_validator.Rules{List: map_validator.BuildListRoles(), Type: reflect.Int, Min: map_validator.SetTotal(3)}).
+		SetRule("empty_list", map_validator.Rules{List: map_validator.BuildListRoles(), Type: reflect.String})
 
-// 	op, err := map_validator.NewValidateBuilder().SetRules(rules).Load(payload)
-// 	if err != nil {
-// 		t.Fatalf("Load error: %s", err)
-// 	}
+	op, err := map_validator.NewValidateBuilder().SetRules(rules).Load(payload)
+	if err != nil {
+		t.Fatalf("Load error: %s", err)
+	}
 
-// 	if _, err = op.RunValidate(); err != nil {
-// 		t.Errorf("Expected no error, but got error: %s", err)
-// 	}
-// }
+	if _, err = op.RunValidate(); err != nil {
+		t.Errorf("Expected no error, but got error: %s", err)
+	}
+}
+
+func TestInvalidWordingList(t *testing.T) {
+	payload := map[string]interface{}{
+		"tags":       []string{"RED", "BLUE"},
+		"user_ids":   []string{"6ba7b810-9dad-11d1-80b4-00c04fd430c8", "6ba7b811-9dad-11d1-80b4-00c04fd430c8"},
+		"numbers":    []string{"satu", "dua", "tiga"},
+		"empty_list": []string{},
+	}
+
+	rules := map_validator.BuildRoles().
+		SetRule("tags", map_validator.Rules{List: map_validator.BuildListRoles(), Enum: &map_validator.EnumField[any]{Items: []string{"GREEN", "BLUE", "RED"}}, Max: map_validator.SetTotal(5)}).
+		SetRule("user_ids", map_validator.Rules{List: map_validator.BuildListRoles(), UUID: true}).
+		SetRule("numbers", map_validator.Rules{List: map_validator.BuildListRoles(), Type: reflect.Int, Min: map_validator.SetTotal(3)}).
+		SetRule("empty_list", map_validator.Rules{List: map_validator.BuildListRoles(), Type: reflect.String})
+
+	op, err := map_validator.NewValidateBuilder().SetRules(rules).Load(payload)
+	if err != nil {
+		t.Fatalf("Load error: %s", err)
+	}
+
+	_, err = op.RunValidate()
+	if err == nil {
+		t.Error("Expected error, but got no error")
+	}
+
+	expectedError := "value in 'numbers' field should be integer"
+	if err != nil && err.Error() != expectedError {
+		t.Errorf("Expected error %s, but got: %s", expectedError, err)
+	}
+}
+
+func TestValidContentLenghtList(t *testing.T) {
+	payload := map[string]interface{}{
+		"tags":    []string{"RED", "BLUE"},
+		"numbers": []int{10, 20, 30, 40, 50, 60, 11},
+	}
+
+	rules := map_validator.BuildRoles().
+		SetRule("tags", map_validator.Rules{
+			List: map_validator.BuildListRoles(),
+			Enum: &map_validator.EnumField[any]{
+				Items: []string{"GREEN", "BLUE", "RED"}},
+			Max: map_validator.SetTotal(5)},
+		).
+		SetRule("numbers", map_validator.Rules{List: map_validator.BuildListRoles().SetListRule(map_validator.ListRules{
+			Min: map_validator.SetTotal(10), Max: map_validator.SetTotal(100),
+		}), Type: reflect.Int, Max: map_validator.SetTotal(7)})
+
+	op, err := map_validator.NewValidateBuilder().SetRules(rules).Load(payload)
+	if err != nil {
+		t.Fatalf("Load error: %s", err)
+	}
+
+	_, err = op.RunValidate()
+	if err != nil {
+		t.Errorf("Expected not error, but got error %s", err)
+	}
+}
+
+func TestInvalidItemContentLenghtList(t *testing.T) {
+	payload := map[string]interface{}{
+		"tags":    []string{"RED", "BLUE"},
+		"numbers": []int{10, 20, 30, 40, 50, 60, 2},
+	}
+
+	rules := map_validator.BuildRoles().
+		SetRule("tags", map_validator.Rules{
+			List: map_validator.BuildListRoles(),
+			Enum: &map_validator.EnumField[any]{
+				Items: []string{"GREEN", "BLUE", "RED"}},
+			Max: map_validator.SetTotal(5)},
+		).
+		SetRule("numbers", map_validator.Rules{List: map_validator.BuildListRoles().SetListRule(map_validator.ListRules{
+			Min: map_validator.SetTotal(10), Max: map_validator.SetTotal(100),
+		}), Type: reflect.Int, Max: map_validator.SetTotal(7)})
+
+	op, err := map_validator.NewValidateBuilder().SetRules(rules).Load(payload)
+	if err != nil {
+		t.Fatalf("Load error: %s", err)
+	}
+
+	_, err = op.RunValidate()
+	if err == nil {
+		t.Errorf("Expected error, but got no error")
+	}
+
+	expectedError := "value in 'numbers' field should be or greater than 10"
+	if err != nil && err.Error() != expectedError {
+		t.Errorf("Expected error %s, but got: %s", expectedError, err)
+	}
+}
+
+func TestInvalidStringItemContentLenghtList(t *testing.T) {
+	payload := map[string]interface{}{
+		"name":    []string{"messi", "ronaldo"},
+		"numbers": []int{10, 20, 30, 40, 50, 60, 12},
+	}
+
+	rules := map_validator.BuildRoles().
+		SetRule("name", map_validator.Rules{
+			List: map_validator.BuildListRoles().SetListRule(map_validator.ListRules{
+				Max: map_validator.SetTotal(3),
+			}),
+			Max: map_validator.SetTotal(5)},
+		).
+		SetRule("numbers", map_validator.Rules{List: map_validator.BuildListRoles().SetListRule(map_validator.ListRules{
+			Min: map_validator.SetTotal(10), Max: map_validator.SetTotal(100),
+		}), Type: reflect.Int, Max: map_validator.SetTotal(7)})
+
+	op, err := map_validator.NewValidateBuilder().SetRules(rules).Load(payload)
+	if err != nil {
+		t.Fatalf("Load error: %s", err)
+	}
+
+	_, err = op.RunValidate()
+	if err == nil {
+		t.Errorf("Expected error, but got no error")
+	}
+
+	expectedError := "value in 'name' field should be or lower than 3"
+	if err != nil && err.Error() != expectedError {
+		t.Errorf("Expected error %s, but got: %s", expectedError, err)
+	}
+}
 
 // // TestInvalidList a negative test case for the new "List" rule.
 // func TestInvalidList(t *testing.T) {
 // 	// Test case 1: Field is not a list
 // 	payload1 := map[string]interface{}{"user_ids": "not-a-list"}
 // 	rules1 := map_validator.BuildRoles().
-// 		SetRule("user_ids", map_validator.Rules{List: true, UUID: true}).
-// 		Done()
+// 		SetRule("user_ids", map_validator.Rules{List: map_validator.BuildListRoles(), UUID: true})
 
 // 	op1, err := map_validator.NewValidateBuilder().SetRules(rules1).Load(payload1)
 // 	if err != nil {
@@ -81,8 +196,7 @@ package test
 // 	// Test case 3: One of the elements is invalid (Max length)
 // 	payload3 := map[string]interface{}{"tags": []string{"ok", "this-tag-is-too-long"}}
 // 	rules3 := map_validator.BuildRoles().
-// 		SetRule("tags", map_validator.Rules{List: true, Type: reflect.String, Max: map_validator.SetTotal(5)}).
-// 		Done()
+// 		SetRule("tags", map_validator.Rules{List: map_validator.BuildListRoles(), Type: reflect.String, Max: map_validator.SetTotal(5)})
 // 	op3, err := map_validator.NewValidateBuilder().SetRules(rules3).Load(payload3)
 // 	if err != nil {
 // 		t.Fatalf("Load error on payload3: %s", err)
@@ -102,12 +216,10 @@ package test
 // func TestListWithObjects(t *testing.T) {
 // 	objectRules := map_validator.BuildRoles().
 // 		SetRule("name", map_validator.Rules{Type: reflect.String, Min: map_validator.SetTotal(3)}).
-// 		SetRule("age", map_validator.Rules{Type: reflect.Int, Min: map_validator.SetTotal(18)}).
-// 		Done()
+// 		SetRule("age", map_validator.Rules{Type: reflect.Int, Min: map_validator.SetTotal(18)})
 
 // 	rules := map_validator.BuildRoles().
-// 		SetRule("users", map_validator.Rules{List: true, Object: &objectRules}).
-// 		Done()
+// 		SetRule("users", map_validator.Rules{List: map_validator.BuildListRoles(), Object: objectRules})
 
 // 	// Success case
 // 	validPayload := map[string]interface{}{
@@ -147,8 +259,7 @@ package test
 
 // func TestListWithMinMax(t *testing.T) {
 // 	rules := map_validator.BuildRoles().
-// 		SetRule("tags", map_validator.Rules{List: true, Type: reflect.String, Min: map_validator.SetTotal(2), Max: map_validator.SetTotal(3)}).
-// 		Done()
+// 		SetRule("tags", map_validator.Rules{List: map_validator.BuildListRoles(), Type: reflect.String, Min: map_validator.SetTotal(2), Max: map_validator.SetTotal(3)})
 
 // 	// Success case
 // 	validPayload := map[string]interface{}{"tags": []string{"go", "test"}}
@@ -195,8 +306,7 @@ package test
 
 // 	rules := map_validator.BuildRoles().
 // 		SetRule("name", map_validator.Rules{Type: reflect.String}).
-// 		SetRule("emails", map_validator.Rules{List: true, Email: true}).
-// 		Done()
+// 		SetRule("emails", map_validator.Rules{List: map_validator.BuildListRoles(), Email: true})
 
 // 	req := httptest.NewRequest("POST", "/test", bytes.NewBufferString(jsonStr))
 // 	req.Header.Set("Content-Type", "application/json")
@@ -220,8 +330,7 @@ package test
 // func TestListWithNull(t *testing.T) {
 // 	// Scenario 1: Null is allowed and field is provided as nil
 // 	rules := map_validator.BuildRoles().
-// 		SetRule("tags", map_validator.Rules{List: true, Type: reflect.String, Null: true}).
-// 		Done()
+// 		SetRule("tags", map_validator.Rules{List: map_validator.BuildListRoles(), Type: reflect.String, Null: true})
 
 // 	payload1 := map[string]interface{}{"tags": nil}
 // 	op1, err := map_validator.NewValidateBuilder().SetRules(rules).Load(payload1)
@@ -244,8 +353,7 @@ package test
 
 // 	// Scenario 3: Null is not allowed and field is missing
 // 	rules2 := map_validator.BuildRoles().
-// 		SetRule("tags", map_validator.Rules{List: true, Type: reflect.String, Null: false}).
-// 		Done()
+// 		SetRule("tags", map_validator.Rules{List: map_validator.BuildListRoles(), Type: reflect.String, Null: false})
 
 // 	payload3 := map[string]interface{}{}
 // 	op3, err := map_validator.NewValidateBuilder().SetRules(rules2).Load(payload3)

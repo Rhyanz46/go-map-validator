@@ -33,15 +33,6 @@ func (rw *rulesWrapper) getRules() map[string]Rules {
 	return rw.Rules
 }
 
-// func (rw *rulesWrapper) SetRules(rules map[string]Rules) RulesWrapper {
-// 	rw.Rules = rules
-// 	return rw
-// }
-
-// func (rw *rulesWrapper) GetRule() Rules {
-// 	return rw.Rule
-// }
-
 func (rw *rulesWrapper) getSetting() Setting {
 	return rw.Setting
 }
@@ -66,7 +57,6 @@ func (rw *rulesWrapper) setFilledField(fields *[]string) RulesWrapper {
 
 func (rw *rulesWrapper) appendFilledField(fields string) {
 	*rw.filledField = append(*rw.filledField, fields)
-	return
 }
 
 func (rw *rulesWrapper) getNullFields() *[]string {
@@ -80,7 +70,6 @@ func (rw *rulesWrapper) setNullFields(fields *[]string) RulesWrapper {
 
 func (rw *rulesWrapper) appendNullFields(fields string) {
 	*rw.nullFields = append(*rw.nullFields, fields)
-	return
 }
 
 func (rw *rulesWrapper) getRequiredWithout() *map[string][]string {
@@ -105,6 +94,6 @@ func (rw *rulesWrapper) getManipulator() []manipulator {
 	return rw.manipulator
 }
 
-func (rw *rulesWrapper) Done() rulesWrapper {
-	return *rw
+func (rw *rulesWrapper) isList() bool {
+	return rw.isListRules
 }

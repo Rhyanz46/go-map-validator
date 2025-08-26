@@ -74,9 +74,6 @@ type ChainerType interface {
 // RulesWrapper defines public methods for rulesWrapper
 type RulesWrapper interface {
 	getRules() map[string]Rules
-	// SetRules(rules map[string]Rules) RulesWrapper
-
-	// GetRule() Rules
 	SetRule(field string, rule Rules) RulesWrapper
 
 	getSetting() Setting
@@ -100,4 +97,8 @@ type RulesWrapper interface {
 	getManipulator() []manipulator
 	SetManipulator(field string, fun func(data interface{}) (result interface{}, err error)) RulesWrapper
 	SetFieldsManipulator(fields []string, fun func(data interface{}) (result interface{}, err error)) RulesWrapper
+}
+
+type ListRulesWrapper interface {
+	SetListRule(rule ListRules) ListRulesWrapper
 }

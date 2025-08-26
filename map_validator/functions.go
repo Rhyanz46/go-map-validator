@@ -126,7 +126,13 @@ func buildMessage(msg string, meta MessageMeta) error {
 
 func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, data map[string]interface{}, rule Rules, loadedFrom loadFromType) (interface{}, error) {
 	//child and parent chain
-	cChain := pChain.AddChild().SetKey(key)
+	var res interface{}
+	var err error
+	chainKey := key
+	if rule.isList() {
+		chainKey = fmt.Sprintf("%s[%d]", pChain.GetKey(), len(pChain.GetChildren())-1)
+	}
+	cChain := pChain.AddChild().SetKey(chainKey)
 	var endOfLoop bool
 	if wrapper != nil && wrapper.getSetting().Strict {
 		var allowedKeys []string
@@ -136,12 +142,12 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 		}
 		for _, XKey := range keys {
 			if !isDataInList(XKey, allowedKeys) {
-				return nil, errors.New(fmt.Sprintf("'%s' is not allowed key", XKey))
+				return nil, fmt.Errorf("'%s' is not allowed key", XKey)
 			}
 		}
 	}
 
-	res, err := validate(key, data, rule, loadedFrom)
+	res, err = validate(key, data, rule, loadedFrom)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +219,7 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 				}
 			}
 			if !required {
-				return nil, errors.New(fmt.Sprintf("if field '%s' is null you need to put value in %v field", field, dependenciesField))
+				return nil, fmt.Errorf("if field '%s' is null you need to put value in %v field", field, dependenciesField)
 			}
 		}
 	}
@@ -245,7 +251,7 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 				}
 			}
 			if !required {
-				return nil, errors.New(fmt.Sprintf("if field '%s' is filled you need to put value in %v field also", field, dependenciesField))
+				return nil, fmt.Errorf("if field '%s' is filled you need to put value in %v field also", field, dependenciesField)
 			}
 		}
 	}
@@ -264,23 +270,36 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 		listRes := res.([]interface{})
 		var manipulated []interface{}
 		for _, xRes := range listRes {
-			tmpChain := newChainer().SetKey(chainKey)
-			for keyX, ruleX := range rule.ListObject.getRules() {
-				_, err = validateRecursive(tmpChain, rule.ListObject, keyX, xRes.(map[string]interface{}), ruleX, fromJSONEncoder)
-				if err != nil {
+			if m, ok := xRes.(map[string]interface{}); ok {
+				// Validate as object with the provided child rules
+				tmpChain := newChainer().SetKey(chainKey)
+				for keyX, ruleX := range rule.ListObject.getRules() {
+					_, err = validateRecursive(tmpChain, rule.ListObject, keyX, m, ruleX, fromJSONEncoder)
+					if err != nil {
+						return nil, err
+					}
+				}
+				// collect validated/manipulated item data back into the slice
+				itemMapFull := tmpChain.GetResult().ToMap()
+				filtered := make(map[string]interface{})
+				for keyAllowed := range rule.ListObject.getRules() {
+					if val, ok := itemMapFull[keyAllowed]; ok {
+						filtered[keyAllowed] = val
+					}
+				}
+				manipulated = append(manipulated, filtered)
+			} else {
+				// Fallback: treat as primitive element; validate against parent rule flags (e.g., UUID, Email)
+				tmpRule := rule
+				tmpRule.Object = nil
+				tmpRule.ListObject = nil
+				tmpRule.List = nil
+				tmpPayload := map[string]interface{}{key: xRes}
+				if _, err := validate(key, tmpPayload, tmpRule, fromJSONEncoder); err != nil {
 					return nil, err
 				}
+				manipulated = append(manipulated, xRes)
 			}
-			// collect validated/manipulated item data back into the slice
-			// ensure only fields defined in ListObject rules are included
-			itemMapFull := tmpChain.GetResult().ToMap()
-			filtered := make(map[string]interface{})
-			for keyAllowed := range rule.ListObject.getRules() {
-				if val, ok := itemMapFull[keyAllowed]; ok {
-					filtered[keyAllowed] = val
-				}
-			}
-			manipulated = append(manipulated, filtered)
 		}
 		cChain.SetValue(manipulated)
 	}
@@ -288,6 +307,7 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 	return res, nil
 }
 
+// validate is the core field validator used across the package and tests
 func validate(field string, dataTemp map[string]interface{}, validator Rules, dataFrom loadFromType) (interface{}, error) {
 	//var oldIntType reflect.Kind
 	data := dataTemp[field]
@@ -318,6 +338,23 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	//	}
 	//	return res, nil
 	//}
+
+	// Keep original element-kind before any normalization
+	originalElementKind := validator.Type
+
+	// Pre-normalize list types to slice kind
+	if validator.ListObject != nil || validator.List != nil {
+		validator.Type = reflect.Slice
+	}
+
+	// Support legacy ListObject when List is not provided: enforce slice and return elements
+	if validator.ListObject != nil && validator.List == nil {
+		s, ok := toInterfaceSlice(data)
+		if !ok {
+			return nil, errors.New("field '" + field + "' is not valid list object")
+		}
+		return s, nil
+	}
 
 	// validatorType type validation
 	dataType := reflect.TypeOf(data).Kind()
@@ -352,6 +389,144 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 			})
 		}
 		return nil, errors.New("the field '" + field + "' should be '" + validator.Type.String() + "'")
+	}
+
+    // Early list handling to avoid container-level regex/enum/type checks
+    if validator.List != nil {
+        sliceDataX, ok := toInterfaceSlice(data)
+        if !ok {
+            return nil, errors.New("field '" + field + "' is not valid list")
+        }
+
+		// List of objects via Object rules or legacy ListObject
+		if validator.Object != nil || validator.ListObject != nil {
+			// ensure elements are objects for Object rules
+			if validator.Object != nil {
+				for _, it := range sliceDataX {
+					if _, ok := it.(map[string]interface{}); !ok {
+						return nil, errors.New("field '" + field + "' is not valid list object")
+					}
+				}
+			}
+			return sliceDataX, nil
+		}
+
+        // Primitive list: validate each element
+        var elementMinPtr, elementMaxPtr *int64
+        if lr, ok := validator.List.(*rulesWrapper); ok {
+            // Treat ListRules.Min/Max as element content length constraints (string only)
+            elementMinPtr = lr.ListRules.Min
+            elementMaxPtr = lr.ListRules.Max
+        }
+        for _, it := range sliceDataX {
+            tmpRule := validator
+            tmpRule.List = nil
+            tmpRule.ListObject = nil
+            tmpRule.Object = nil
+            // restore element type for per-item validation
+            tmpRule.Type = originalElementKind
+            // By default, do not carry container Min/Max into element checks
+            tmpRule.Min = nil
+            tmpRule.Max = nil
+            // Apply element content constraints (pre-check) for string and numeric elements
+            if it != nil {
+                gotKind := reflect.TypeOf(it).Kind()
+                // Resolve effective element kind: explicit Type if provided, else infer from value
+                effectiveKind := originalElementKind
+                if effectiveKind == reflect.Invalid {
+                    effectiveKind = gotKind
+                }
+                // String length constraints
+                if effectiveKind == reflect.String && gotKind == reflect.String {
+                    if elementMinPtr != nil {
+                        if int64(utf8.RuneCountInString(it.(string))) < *elementMinPtr {
+                            return nil, fmt.Errorf("value in '%s' field should be or greater than %v", field, *elementMinPtr)
+                        }
+                    }
+                    if elementMaxPtr != nil {
+                        if int64(utf8.RuneCountInString(it.(string))) > *elementMaxPtr {
+                            return nil, fmt.Errorf("value in '%s' field should be or lower than %v", field, *elementMaxPtr)
+                        }
+                    }
+                }
+                // Numeric value constraints
+                if isIntegerFamily(effectiveKind) && isIntegerFamily(gotKind) {
+                    // normalize to float64 for comparison
+                    var num float64
+                    switch v := it.(type) {
+                    case int:
+                        num = float64(v)
+                    case int8:
+                        num = float64(v)
+                    case int16:
+                        num = float64(v)
+                    case int32:
+                        num = float64(v)
+                    case int64:
+                        num = float64(v)
+                    case uint:
+                        num = float64(v)
+                    case uint8:
+                        num = float64(v)
+                    case uint16:
+                        num = float64(v)
+                    case uint32:
+                        num = float64(v)
+                    case uint64:
+                        num = float64(v)
+                    case float32:
+                        num = float64(v)
+                    case float64:
+                        num = v
+                    default:
+                        // fallback: let validate handle
+                        num = 0
+                    }
+                    if elementMinPtr != nil && num < float64(*elementMinPtr) {
+                        return nil, fmt.Errorf("value in '%s' field should be or greater than %v", field, *elementMinPtr)
+                    }
+                    if elementMaxPtr != nil && num > float64(*elementMaxPtr) {
+                        return nil, fmt.Errorf("value in '%s' field should be or lower than %v", field, *elementMaxPtr)
+                    }
+                }
+            }
+			// Pre-check element type mismatch to craft a clearer wording
+			// Only when element Type is explicitly set (avoid interfering with Enum/UUID/Regex-only rules)
+			if it != nil && tmpRule.Type != reflect.Invalid {
+				gotKind := reflect.TypeOf(it).Kind()
+				expectedKind := tmpRule.Type
+				allowIntCoerce := (dataFrom == fromHttpJson || dataFrom == fromJSONEncoder) && isIntegerFamily(expectedKind) && isIntegerFamily(gotKind)
+				if gotKind != expectedKind && !allowIntCoerce {
+					// Map kind to human-friendly noun (e.g., int/uint/float -> integer)
+					noun := expectedKind.String()
+					if isIntegerFamily(expectedKind) {
+						noun = "integer"
+					}
+					return nil, fmt.Errorf("value in '%s' field should be %s", field, noun)
+				}
+			}
+
+			tmpPayload := map[string]interface{}{field: it}
+			if _, err := validate(field, tmpPayload, tmpRule, dataFrom); err != nil {
+				return nil, err
+			}
+		}
+        // list-size Min/Max come from outer rule (container size)
+        var minPtr, maxPtr *int64
+        if validator.Min != nil {
+            minPtr = validator.Min
+        }
+        if validator.Max != nil {
+            maxPtr = validator.Max
+        }
+        listLen := int64(len(sliceDataX))
+        if minPtr != nil && listLen < *minPtr {
+            return nil, fmt.Errorf("the field '%s' should be or greater than %v", field, *minPtr)
+        }
+        if maxPtr != nil && listLen > *maxPtr {
+			return nil, fmt.Errorf("the field '%s' should be or lower than %v", field, *maxPtr)
+		}
+		return sliceDataX, nil
 	}
 
 	if validator.File {
@@ -393,7 +568,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 					values = append(values, int(enumValue.Index(i).Int()))
 				}
 				if !valueInList[int](values, data.(int), isEqualInt) {
-					return nil, errors.New(fmt.Sprintf("the field '%s' value is not in enum list%v", field, values))
+					return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
 				}
 			case reflect.Int64:
 				var values []int64
@@ -401,7 +576,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 					values = append(values, enumValue.Index(i).Int())
 				}
 				if !valueInList[int64](values, data.(int64), isEqualInt64) {
-					return nil, errors.New(fmt.Sprintf("the field '%s' value is not in enum list%v", field, values))
+					return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
 				}
 			case reflect.Float64:
 				var values []float64
@@ -409,7 +584,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 					values = append(values, enumValue.Index(i).Float())
 				}
 				if !valueInList[float64](values, data.(float64), isEqualFloat64) {
-					return nil, errors.New(fmt.Sprintf("the field '%s' value is not in enum list%v", field, values))
+					return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
 				}
 			case reflect.String:
 				var values []string
@@ -417,7 +592,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 					values = append(values, enumValue.Index(i).String())
 				}
 				if !valueInList[string](values, data.(string), isEqualString) {
-					return nil, errors.New(fmt.Sprintf("the field '%s' value is not in enum list%v", field, values))
+					return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
 				}
 			default:
 				panic("not support type validatorType for enum value")
@@ -512,24 +687,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 		return false, nil
 	}
 
-	if validator.ListObject != nil {
-		validator.Type = reflect.Slice
-	}
-
-	if validator.Type == reflect.Slice {
-		sliceDataX, ok := toInterfaceSlice(data)
-		if validator.ListObject != nil {
-			if !ok {
-				return nil, errors.New("field '" + field + "' is not valid list object")
-			}
-		}
-		if !ok {
-			return nil, errors.New("field '" + field + "' is not valid list")
-		}
-		sliceData = sliceDataX
-		data = sliceDataX
-	}
-
+	// legacy ListObject fallback occurs via early list handling
 	if validator.AnonymousObject || validator.Object != nil {
 		res, err := toMapStringInterface(data)
 		if err != nil {
@@ -538,10 +696,17 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 		return res, nil
 	}
 
+	// Ensure sliceData is available for legacy slice length checks
+	if sliceData == nil && data != nil && reflect.TypeOf(data).Kind() == reflect.Slice {
+		if s, ok := toInterfaceSlice(data); ok {
+			sliceData = s
+		}
+	}
+
 	if validator.Min != nil && data != nil {
 		var isErr bool
 		var actualLength int64
-		err := errors.New(fmt.Sprintf("the field '%s' should be or greater than %v", field, *validator.Min))
+		err := fmt.Errorf("the field '%s' should be or greater than %v", field, *validator.Min)
 		if reflect.String == dataType {
 			if total := utf8.RuneCountInString(data.(string)); int64(total) < *validator.Min {
 				isErr = true
@@ -577,7 +742,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	if validator.Max != nil && data != nil {
 		var isErr bool
 		var actualLength int64
-		err := errors.New(fmt.Sprintf("the field '%s' should be or lower than %v", field, *validator.Max))
+		err := fmt.Errorf("the field '%s' should be or lower than %v", field, *validator.Max)
 		if reflect.String == dataType {
 			if total := utf8.RuneCountInString(data.(string)); int64(total) > *validator.Max {
 				isErr = true
