@@ -558,9 +558,39 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 		enumType := reflect.TypeOf(validator.Enum.Items)
 		if enumType.Kind() == reflect.Slice {
 			enumValue := reflect.ValueOf(validator.Enum.Items)
+			// Handle integer family coercion for HTTP JSON like regular type validation
 			if dataType != enumType.Elem().Kind() {
-				return nil, errors.New("the field '" + field + "' should be '" + enumType.Elem().Kind().String() + "'")
+				// Allow type mismatch for integer family from HTTP JSON
+				if (dataFrom == fromHttpJson || dataFrom == fromJSONEncoder) && 
+				   isIntegerFamily(enumType.Elem().Kind()) && isIntegerFamily(dataType) {
+					// Type coercion will be handled in the switch cases below
+				} else {
+					return nil, errors.New("the field '" + field + "' should be '" + enumType.Elem().Kind().String() + "'")
+				}
 			}
+			
+			// Handle cross-type enum validation for integer family from HTTP JSON
+			if (dataFrom == fromHttpJson || dataFrom == fromJSONEncoder) && 
+			   isIntegerFamily(enumType.Elem().Kind()) && isIntegerFamily(dataType) &&
+			   dataType != enumType.Elem().Kind() {
+				// Convert float64 JSON data to compare with int enum items
+				if dataType == reflect.Float64 && enumType.Elem().Kind() == reflect.Int {
+					floatData := data.(float64)
+					// Check if float64 can be safely converted to int (no decimal part)
+					if floatData == float64(int(floatData)) {
+						var values []int
+						for i := 0; i < enumValue.Len(); i++ {
+							values = append(values, int(enumValue.Index(i).Int()))
+						}
+						if !valueInList[int](values, int(floatData), isEqualInt) {
+							return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
+						}
+						return data, nil
+					}
+				}
+				// Add more cross-type conversions as needed
+			}
+			
 			switch dataType {
 			case reflect.Int:
 				var values []int

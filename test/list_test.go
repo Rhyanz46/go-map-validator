@@ -165,7 +165,6 @@ func TestListWithHttpRequest(t *testing.T) {
 	}`
 
 	rules := map_validator.BuildRoles().
-		SetRule("name", map_validator.Rules{Type: reflect.String}).
 		SetRule("emails", map_validator.Rules{List: map_validator.BuildListRoles(), Email: true})
 
 	req := httptest.NewRequest("POST", "/test", bytes.NewBufferString(jsonStr))

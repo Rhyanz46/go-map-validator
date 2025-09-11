@@ -55,3 +55,26 @@ func TestStrinEnumWithHttpRequest(t *testing.T) {
 	}
 
 }
+
+func TestIntegerEnumFamily(t *testing.T) {
+	dataMap := map[string]interface{}{
+		"port": 80,
+	}
+
+	rules := map_validator.BuildRoles().SetRule("port", map_validator.Rules{
+		Enum: &map_validator.EnumField[any]{
+			Items: []int{80, 443},
+		},
+	})
+
+	jsonHttp, err := map_validator.NewValidateBuilder().SetRules(rules).Load(dataMap)
+	if err != nil {
+		t.Fatalf("load error : %s", err)
+	}
+
+	_, err = jsonHttp.RunValidate()
+	if err != nil {
+		t.Fatalf("Expected no fail, but it fail, %s", err.Error())
+	}
+
+}
