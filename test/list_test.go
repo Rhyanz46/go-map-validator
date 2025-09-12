@@ -1,7 +1,10 @@
 package test
 
 import (
+	"bytes"
+	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/Rhyanz46/go-map-validator/map_validator"
@@ -153,6 +156,33 @@ func TestInvalidStringItemContentLenghtList(t *testing.T) {
 	expectedError := "value in 'name' field should be or lower than 3"
 	if err != nil && err.Error() != expectedError {
 		t.Errorf("Expected error %s, but got: %s", expectedError, err)
+	}
+}
+
+func TestListWithHttpRequest(t *testing.T) {
+	jsonStr := `{
+		"emails": ["test1@example.com", "test2@example.com", "not-an-email", "test4@example.com"]
+	}`
+
+	rules := map_validator.BuildRoles().
+		SetRule("emails", map_validator.Rules{List: map_validator.BuildListRoles(), Email: true})
+
+	req := httptest.NewRequest("POST", "/test", bytes.NewBufferString(jsonStr))
+	req.Header.Set("Content-Type", "application/json")
+
+	jsonHttp, err := map_validator.NewValidateBuilder().SetRules(rules).LoadJsonHttp(req)
+	if err != nil {
+		t.Fatalf("load error : %s", err)
+	}
+
+	_, err = jsonHttp.RunValidate()
+	if err == nil {
+		t.Fatal("Expected validation to fail, but it passed")
+	}
+
+	// Check if the error message is correct
+	if !strings.Contains(err.Error(), "not valid email") {
+		t.Errorf("Expected error to be about email validation, but got: %s", err.Error())
 	}
 }
 
