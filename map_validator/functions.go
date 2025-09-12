@@ -573,25 +573,95 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 			if (dataFrom == fromHttpJson || dataFrom == fromJSONEncoder) && 
 			   isIntegerFamily(enumType.Elem().Kind()) && isIntegerFamily(dataType) &&
 			   dataType != enumType.Elem().Kind() {
-				// Convert float64 JSON data to compare with int enum items
-				if dataType == reflect.Float64 && enumType.Elem().Kind() == reflect.Int {
+				// Convert float64 JSON data to compare with integer family enum items
+				if dataType == reflect.Float64 {
 					floatData := data.(float64)
-					// Check if float64 can be safely converted to int (no decimal part)
-					if floatData == float64(int(floatData)) {
-						var values []int
-						for i := 0; i < enumValue.Len(); i++ {
-							values = append(values, int(enumValue.Index(i).Int()))
+					enumKind := enumType.Elem().Kind()
+					
+					// For float32 and float64, no integer conversion check needed
+					if enumKind == reflect.Float32 || enumKind == reflect.Float64 {
+						// Handle float enum types
+						switch enumKind {
+						case reflect.Float32:
+							var values []float32
+							for i := 0; i < enumValue.Len(); i++ {
+								values = append(values, float32(enumValue.Index(i).Float()))
+							}
+							if !valueInList[float32](values, float32(floatData), func(a, b float32) bool { return a == b }) {
+								return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
+							}
+						case reflect.Float64:
+							var values []float64
+							for i := 0; i < enumValue.Len(); i++ {
+								values = append(values, enumValue.Index(i).Float())
+							}
+							if !valueInList[float64](values, floatData, isEqualFloat64) {
+								return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
+							}
 						}
-						if !valueInList[int](values, int(floatData), isEqualInt) {
-							return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
+						return data, nil
+					}
+					
+					// Check if float64 can be safely converted to integer (no decimal part)
+					if floatData == float64(int64(floatData)) {
+						// Handle different integer enum types
+						switch enumType.Elem().Kind() {
+						case reflect.Int:
+							var values []int
+							for i := 0; i < enumValue.Len(); i++ {
+								values = append(values, int(enumValue.Index(i).Int()))
+							}
+							if !valueInList[int](values, int(floatData), isEqualInt) {
+								return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
+							}
+						case reflect.Int64:
+							var values []int64
+							for i := 0; i < enumValue.Len(); i++ {
+								values = append(values, enumValue.Index(i).Int())
+							}
+							if !valueInList[int64](values, int64(floatData), isEqualInt64) {
+								return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
+							}
+						case reflect.Int32:
+							var values []int32
+							for i := 0; i < enumValue.Len(); i++ {
+								values = append(values, int32(enumValue.Index(i).Int()))
+							}
+							if !valueInList[int32](values, int32(floatData), func(a, b int32) bool { return a == b }) {
+								return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
+							}
+						case reflect.Int16:
+							var values []int16
+							for i := 0; i < enumValue.Len(); i++ {
+								values = append(values, int16(enumValue.Index(i).Int()))
+							}
+							if !valueInList[int16](values, int16(floatData), func(a, b int16) bool { return a == b }) {
+								return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
+							}
+						case reflect.Int8:
+							var values []int8
+							for i := 0; i < enumValue.Len(); i++ {
+								values = append(values, int8(enumValue.Index(i).Int()))
+							}
+							if !valueInList[int8](values, int8(floatData), func(a, b int8) bool { return a == b }) {
+								return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
+							}
+						case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8:
+							// Handle unsigned integers
+							var values []uint64
+							for i := 0; i < enumValue.Len(); i++ {
+								values = append(values, enumValue.Index(i).Uint())
+							}
+							if floatData < 0 || !valueInList[uint64](values, uint64(floatData), func(a, b uint64) bool { return a == b }) {
+								return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
+							}
 						}
 						return data, nil
 					} else {
-						// Float has decimal part, cannot convert to int enum
+						// Float has decimal part, cannot convert to integer enum
 						return nil, errors.New("the field '" + field + "' should be '" + enumType.Elem().Kind().String() + "'")
 					}
 				}
-				// Add more cross-type conversions as needed
 			}
 			
 			switch dataType {
