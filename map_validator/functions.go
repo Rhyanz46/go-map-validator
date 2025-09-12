@@ -586,6 +586,9 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 							return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
 						}
 						return data, nil
+					} else {
+						// Float has decimal part, cannot convert to int enum
+						return nil, errors.New("the field '" + field + "' should be '" + enumType.Elem().Kind().String() + "'")
 					}
 				}
 				// Add more cross-type conversions as needed
