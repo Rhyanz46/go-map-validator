@@ -369,7 +369,6 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 		validator.ListObject == nil &&
 		!validator.AnonymousObject &&
 		!validator.File &&
-		!validator.IPV4Network &&
 		validator.RegexString == "")
 
 	//if dataType == reflect.Slice && !validator.Null && len(toInterfaceSlice(data)) == 0 {
@@ -391,12 +390,12 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 		return nil, errors.New("the field '" + field + "' should be '" + validator.Type.String() + "'")
 	}
 
-    // Early list handling to avoid container-level regex/enum/type checks
-    if validator.List != nil {
-        sliceDataX, ok := toInterfaceSlice(data)
-        if !ok {
-            return nil, errors.New("field '" + field + "' is not valid list")
-        }
+	// Early list handling to avoid container-level regex/enum/type checks
+	if validator.List != nil {
+		sliceDataX, ok := toInterfaceSlice(data)
+		if !ok {
+			return nil, errors.New("field '" + field + "' is not valid list")
+		}
 
 		// List of objects via Object rules or legacy ListObject
 		if validator.Object != nil || validator.ListObject != nil {
@@ -411,85 +410,85 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 			return sliceDataX, nil
 		}
 
-        // Primitive list: validate each element
-        var elementMinPtr, elementMaxPtr *int64
-        if lr, ok := validator.List.(*rulesWrapper); ok {
-            // Treat ListRules.Min/Max as element content length constraints (string only)
-            elementMinPtr = lr.ListRules.Min
-            elementMaxPtr = lr.ListRules.Max
-        }
-        for _, it := range sliceDataX {
-            tmpRule := validator
-            tmpRule.List = nil
-            tmpRule.ListObject = nil
-            tmpRule.Object = nil
-            // restore element type for per-item validation
-            tmpRule.Type = originalElementKind
-            // By default, do not carry container Min/Max into element checks
-            tmpRule.Min = nil
-            tmpRule.Max = nil
-            // Apply element content constraints (pre-check) for string and numeric elements
-            if it != nil {
-                gotKind := reflect.TypeOf(it).Kind()
-                // Resolve effective element kind: explicit Type if provided, else infer from value
-                effectiveKind := originalElementKind
-                if effectiveKind == reflect.Invalid {
-                    effectiveKind = gotKind
-                }
-                // String length constraints
-                if effectiveKind == reflect.String && gotKind == reflect.String {
-                    if elementMinPtr != nil {
-                        if int64(utf8.RuneCountInString(it.(string))) < *elementMinPtr {
-                            return nil, fmt.Errorf("value in '%s' field should be or greater than %v", field, *elementMinPtr)
-                        }
-                    }
-                    if elementMaxPtr != nil {
-                        if int64(utf8.RuneCountInString(it.(string))) > *elementMaxPtr {
-                            return nil, fmt.Errorf("value in '%s' field should be or lower than %v", field, *elementMaxPtr)
-                        }
-                    }
-                }
-                // Numeric value constraints
-                if isIntegerFamily(effectiveKind) && isIntegerFamily(gotKind) {
-                    // normalize to float64 for comparison
-                    var num float64
-                    switch v := it.(type) {
-                    case int:
-                        num = float64(v)
-                    case int8:
-                        num = float64(v)
-                    case int16:
-                        num = float64(v)
-                    case int32:
-                        num = float64(v)
-                    case int64:
-                        num = float64(v)
-                    case uint:
-                        num = float64(v)
-                    case uint8:
-                        num = float64(v)
-                    case uint16:
-                        num = float64(v)
-                    case uint32:
-                        num = float64(v)
-                    case uint64:
-                        num = float64(v)
-                    case float32:
-                        num = float64(v)
-                    case float64:
-                        num = v
-                    default:
-                        // fallback: let validate handle
-                        num = 0
-                    }
-                    if elementMinPtr != nil && num < float64(*elementMinPtr) {
-                        return nil, fmt.Errorf("value in '%s' field should be or greater than %v", field, *elementMinPtr)
-                    }
-                    if elementMaxPtr != nil && num > float64(*elementMaxPtr) {
-                        return nil, fmt.Errorf("value in '%s' field should be or lower than %v", field, *elementMaxPtr)
-                    }
-                }
-            }
+		// Primitive list: validate each element
+		var elementMinPtr, elementMaxPtr *int64
+		if lr, ok := validator.List.(*rulesWrapper); ok {
+			// Treat ListRules.Min/Max as element content length constraints (string only)
+			elementMinPtr = lr.ListRules.Min
+			elementMaxPtr = lr.ListRules.Max
+		}
+		for _, it := range sliceDataX {
+			tmpRule := validator
+			tmpRule.List = nil
+			tmpRule.ListObject = nil
+			tmpRule.Object = nil
+			// restore element type for per-item validation
+			tmpRule.Type = originalElementKind
+			// By default, do not carry container Min/Max into element checks
+			tmpRule.Min = nil
+			tmpRule.Max = nil
+			// Apply element content constraints (pre-check) for string and numeric elements
+			if it != nil {
+				gotKind := reflect.TypeOf(it).Kind()
+				// Resolve effective element kind: explicit Type if provided, else infer from value
+				effectiveKind := originalElementKind
+				if effectiveKind == reflect.Invalid {
+					effectiveKind = gotKind
+				}
+				// String length constraints
+				if effectiveKind == reflect.String && gotKind == reflect.String {
+					if elementMinPtr != nil {
+						if int64(utf8.RuneCountInString(it.(string))) < *elementMinPtr {
+							return nil, fmt.Errorf("value in '%s' field should be or greater than %v", field, *elementMinPtr)
+						}
+					}
+					if elementMaxPtr != nil {
+						if int64(utf8.RuneCountInString(it.(string))) > *elementMaxPtr {
+							return nil, fmt.Errorf("value in '%s' field should be or lower than %v", field, *elementMaxPtr)
+						}
+					}
+				}
+				// Numeric value constraints
+				if isIntegerFamily(effectiveKind) && isIntegerFamily(gotKind) {
+					// normalize to float64 for comparison
+					var num float64
+					switch v := it.(type) {
+					case int:
+						num = float64(v)
+					case int8:
+						num = float64(v)
+					case int16:
+						num = float64(v)
+					case int32:
+						num = float64(v)
+					case int64:
+						num = float64(v)
+					case uint:
+						num = float64(v)
+					case uint8:
+						num = float64(v)
+					case uint16:
+						num = float64(v)
+					case uint32:
+						num = float64(v)
+					case uint64:
+						num = float64(v)
+					case float32:
+						num = float64(v)
+					case float64:
+						num = v
+					default:
+						// fallback: let validate handle
+						num = 0
+					}
+					if elementMinPtr != nil && num < float64(*elementMinPtr) {
+						return nil, fmt.Errorf("value in '%s' field should be or greater than %v", field, *elementMinPtr)
+					}
+					if elementMaxPtr != nil && num > float64(*elementMaxPtr) {
+						return nil, fmt.Errorf("value in '%s' field should be or lower than %v", field, *elementMaxPtr)
+					}
+				}
+			}
 			// Pre-check element type mismatch to craft a clearer wording
 			// Only when element Type is explicitly set (avoid interfering with Enum/UUID/Regex-only rules)
 			if it != nil && tmpRule.Type != reflect.Invalid {
@@ -511,19 +510,19 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 				return nil, err
 			}
 		}
-        // list-size Min/Max come from outer rule (container size)
-        var minPtr, maxPtr *int64
-        if validator.Min != nil {
-            minPtr = validator.Min
-        }
-        if validator.Max != nil {
-            maxPtr = validator.Max
-        }
-        listLen := int64(len(sliceDataX))
-        if minPtr != nil && listLen < *minPtr {
-            return nil, fmt.Errorf("the field '%s' should be or greater than %v", field, *minPtr)
-        }
-        if maxPtr != nil && listLen > *maxPtr {
+		// list-size Min/Max come from outer rule (container size)
+		var minPtr, maxPtr *int64
+		if validator.Min != nil {
+			minPtr = validator.Min
+		}
+		if validator.Max != nil {
+			maxPtr = validator.Max
+		}
+		listLen := int64(len(sliceDataX))
+		if minPtr != nil && listLen < *minPtr {
+			return nil, fmt.Errorf("the field '%s' should be or greater than %v", field, *minPtr)
+		}
+		if maxPtr != nil && listLen > *maxPtr {
 			return nil, fmt.Errorf("the field '%s' should be or lower than %v", field, *maxPtr)
 		}
 		return sliceDataX, nil
@@ -554,6 +553,19 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 		return data, nil
 	}
 
+	// Helper function to build enum error message with custom or default text
+	buildEnumErrorMessage := func(enumValues interface{}, enumType reflect.Type, actualType reflect.Kind) error {
+		if validator.CustomMsg.OnEnumValueNotMatch != nil {
+			expectedType := enumType.Elem().Kind()
+			return buildMessage(*validator.CustomMsg.OnEnumValueNotMatch, MessageMeta{
+				Field:        &field,
+				ExpectedType: &expectedType,
+				ActualType:   &actualType,
+			})
+		}
+		return fmt.Errorf("the field '%s' value is not in enum list%v", field, enumValues)
+	}
+
 	if validator.Enum != nil {
 		enumType := reflect.TypeOf(validator.Enum.Items)
 		if enumType.Kind() == reflect.Slice {
@@ -561,23 +573,32 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 			// Handle integer family coercion for HTTP JSON like regular type validation
 			if dataType != enumType.Elem().Kind() {
 				// Allow type mismatch for integer family from HTTP JSON
-				if (dataFrom == fromHttpJson || dataFrom == fromJSONEncoder) && 
-				   isIntegerFamily(enumType.Elem().Kind()) && isIntegerFamily(dataType) {
+				if (dataFrom == fromHttpJson || dataFrom == fromJSONEncoder) &&
+					isIntegerFamily(enumType.Elem().Kind()) && isIntegerFamily(dataType) {
 					// Type coercion will be handled in the switch cases below
 				} else {
-					return nil, errors.New("the field '" + field + "' should be '" + enumType.Elem().Kind().String() + "'")
+					// Use custom message for type mismatch if available, otherwise use custom enum message or default
+					if validator.CustomMsg.OnTypeNotMatch != nil {
+						expectedType := enumType.Elem().Kind()
+						return nil, buildMessage(*validator.CustomMsg.OnTypeNotMatch, MessageMeta{
+							Field:        &field,
+							ExpectedType: &expectedType,
+							ActualType:   &dataType,
+						})
+					}
+					return nil, buildEnumErrorMessage(nil, enumType, dataType)
 				}
 			}
-			
+
 			// Handle cross-type enum validation for integer family from HTTP JSON
-			if (dataFrom == fromHttpJson || dataFrom == fromJSONEncoder) && 
-			   isIntegerFamily(enumType.Elem().Kind()) && isIntegerFamily(dataType) &&
-			   dataType != enumType.Elem().Kind() {
+			if (dataFrom == fromHttpJson || dataFrom == fromJSONEncoder) &&
+				isIntegerFamily(enumType.Elem().Kind()) && isIntegerFamily(dataType) &&
+				dataType != enumType.Elem().Kind() {
 				// Convert float64 JSON data to compare with integer family enum items
 				if dataType == reflect.Float64 {
 					floatData := data.(float64)
 					enumKind := enumType.Elem().Kind()
-					
+
 					// For float32 and float64, no integer conversion check needed
 					if enumKind == reflect.Float32 || enumKind == reflect.Float64 {
 						// Handle float enum types
@@ -588,7 +609,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 								values = append(values, float32(enumValue.Index(i).Float()))
 							}
 							if !valueInList[float32](values, float32(floatData), func(a, b float32) bool { return a == b }) {
-								return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
+								return nil, buildEnumErrorMessage(values, enumType, dataType)
 							}
 						case reflect.Float64:
 							var values []float64
@@ -596,12 +617,12 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 								values = append(values, enumValue.Index(i).Float())
 							}
 							if !valueInList[float64](values, floatData, isEqualFloat64) {
-								return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
+								return nil, buildEnumErrorMessage(values, enumType, dataType)
 							}
 						}
 						return data, nil
 					}
-					
+
 					// Check if float64 can be safely converted to integer (no decimal part)
 					if floatData == float64(int64(floatData)) {
 						// Handle different integer enum types
@@ -612,7 +633,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 								values = append(values, int(enumValue.Index(i).Int()))
 							}
 							if !valueInList[int](values, int(floatData), isEqualInt) {
-								return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
+								return nil, buildEnumErrorMessage(values, enumType, dataType)
 							}
 						case reflect.Int64:
 							var values []int64
@@ -620,7 +641,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 								values = append(values, enumValue.Index(i).Int())
 							}
 							if !valueInList[int64](values, int64(floatData), isEqualInt64) {
-								return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
+								return nil, buildEnumErrorMessage(values, enumType, dataType)
 							}
 						case reflect.Int32:
 							var values []int32
@@ -628,7 +649,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 								values = append(values, int32(enumValue.Index(i).Int()))
 							}
 							if !valueInList[int32](values, int32(floatData), func(a, b int32) bool { return a == b }) {
-								return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
+								return nil, buildEnumErrorMessage(values, enumType, dataType)
 							}
 						case reflect.Int16:
 							var values []int16
@@ -636,7 +657,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 								values = append(values, int16(enumValue.Index(i).Int()))
 							}
 							if !valueInList[int16](values, int16(floatData), func(a, b int16) bool { return a == b }) {
-								return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
+								return nil, buildEnumErrorMessage(values, enumType, dataType)
 							}
 						case reflect.Int8:
 							var values []int8
@@ -644,7 +665,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 								values = append(values, int8(enumValue.Index(i).Int()))
 							}
 							if !valueInList[int8](values, int8(floatData), func(a, b int8) bool { return a == b }) {
-								return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
+								return nil, buildEnumErrorMessage(values, enumType, dataType)
 							}
 						case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8:
 							// Handle unsigned integers
@@ -653,7 +674,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 								values = append(values, enumValue.Index(i).Uint())
 							}
 							if floatData < 0 || !valueInList[uint64](values, uint64(floatData), func(a, b uint64) bool { return a == b }) {
-								return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
+								return nil, buildEnumErrorMessage(values, enumType, dataType)
 							}
 						}
 						return data, nil
@@ -663,7 +684,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 					}
 				}
 			}
-			
+
 			switch dataType {
 			case reflect.Int:
 				var values []int
@@ -671,7 +692,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 					values = append(values, int(enumValue.Index(i).Int()))
 				}
 				if !valueInList[int](values, data.(int), isEqualInt) {
-					return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
+					return nil, buildEnumErrorMessage(values, enumType, dataType)
 				}
 			case reflect.Int64:
 				var values []int64
@@ -679,7 +700,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 					values = append(values, enumValue.Index(i).Int())
 				}
 				if !valueInList[int64](values, data.(int64), isEqualInt64) {
-					return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
+					return nil, buildEnumErrorMessage(values, enumType, dataType)
 				}
 			case reflect.Float64:
 				var values []float64
@@ -687,7 +708,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 					values = append(values, enumValue.Index(i).Float())
 				}
 				if !valueInList[float64](values, data.(float64), isEqualFloat64) {
-					return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
+					return nil, buildEnumErrorMessage(values, enumType, dataType)
 				}
 			case reflect.String:
 				var values []string
@@ -695,7 +716,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 					values = append(values, enumValue.Index(i).String())
 				}
 				if !valueInList[string](values, data.(string), isEqualString) {
-					return nil, fmt.Errorf("the field '%s' value is not in enum list%v", field, values)
+					return nil, buildEnumErrorMessage(values, enumType, dataType)
 				}
 			default:
 				panic("not support type validatorType for enum value")
