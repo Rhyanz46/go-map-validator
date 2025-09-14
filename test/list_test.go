@@ -186,6 +186,59 @@ func TestListWithHttpRequest(t *testing.T) {
 	}
 }
 
+func TestValidItemContentLenghtListBind(t *testing.T) {
+	type dataRes struct {
+		Tags    []string `json:"tags"`
+		Numbers []int    `json:"numbers"`
+	}
+	var ress dataRes
+	payload := map[string]interface{}{
+		"tags":    []string{"RED", "BLUE"},
+		"numbers": []int{10, 20, 30, 40, 50, 60},
+	}
+
+	rules := map_validator.BuildRoles().
+		SetRule("tags", map_validator.Rules{
+			List: map_validator.BuildListRoles(),
+			Enum: &map_validator.EnumField[any]{
+				Items: []string{"GREEN", "BLUE", "RED"}},
+			Max: map_validator.SetTotal(5)},
+		).
+		SetRule("numbers", map_validator.Rules{
+			List: map_validator.
+				BuildListRoles().
+				SetListRule(map_validator.ListRules{
+					Min: map_validator.SetTotal(10),
+					Max: map_validator.SetTotal(100),
+				}),
+			Type: reflect.Int,
+			Max:  map_validator.SetTotal(7),
+		})
+
+	op, err := map_validator.NewValidateBuilder().SetRules(rules).Load(payload)
+	if err != nil {
+		t.Fatalf("Load error: %s", err)
+	}
+
+	validatedData, err := op.RunValidate()
+	if err != nil {
+		t.Errorf("Expected no error but got: %s", err)
+	}
+
+	err = validatedData.Bind(&ress)
+	if err != nil {
+		t.Errorf("Expected no error but got: %s", err)
+	}
+
+	if len(ress.Numbers) != 6 {
+		t.Errorf("Expected 6 numbers but got: %v", len(ress.Numbers))
+	}
+
+	if len(ress.Tags) != 2 {
+		t.Errorf("Expected 2 tags but got: %v", len(ress.Tags))
+	}
+}
+
 // // TestInvalidList a negative test case for the new "List" rule.
 // func TestInvalidList(t *testing.T) {
 // 	// Test case 1: Field is not a list

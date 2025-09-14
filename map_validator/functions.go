@@ -129,7 +129,8 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 	var res interface{}
 	var err error
 	chainKey := key
-	if rule.isList() {
+	// Only use indexed keys for ListObject, not for primitive List
+	if rule.isList() && rule.ListObject != nil {
 		chainKey = fmt.Sprintf("%s[%d]", pChain.GetKey(), len(pChain.GetChildren())-1)
 	}
 	cChain := pChain.AddChild().SetKey(chainKey)
