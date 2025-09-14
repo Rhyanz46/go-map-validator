@@ -27,8 +27,8 @@ type EnumField[T any] struct {
 }
 
 type CustomMsg struct {
-	OnTypeNotMatch *string
-	//OnEnumValueNotMatch *string
+	OnTypeNotMatch      *string
+	OnEnumValueNotMatch *string
 	//OnNull              *string
 	OnMax         *string
 	OnMin         *string
@@ -56,11 +56,18 @@ func (cm *CustomMsg) typeNotMatchNotNil() bool {
 	return cm.OnTypeNotMatch != nil
 }
 
+func (cm *CustomMsg) enumValueNotMatchNotNil() bool {
+	return cm.OnEnumValueNotMatch != nil
+}
+
 func (cm *CustomMsg) isNotNil() (notNil bool) {
 	if cm == nil {
 		return
 	}
 	if cm.OnTypeNotMatch != nil {
+		notNil = true
+	}
+	if cm.OnEnumValueNotMatch != nil {
 		notNil = true
 	}
 	if cm.OnMax != nil {

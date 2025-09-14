@@ -141,6 +141,81 @@ func TestInvalidLengthMessage(t *testing.T) {
 	}
 }
 
+func TestCustomEnumMessage(t *testing.T) {
+	payload := map[string]interface{}{"status": "invalid_status"}
+	validRole := map_validator.BuildRoles().SetRule("status", map_validator.Rules{
+		Type: reflect.String,
+		Enum: &map_validator.EnumField[any]{Items: []string{"active", "inactive", "pending"}},
+		CustomMsg: map_validator.CustomMsg{
+			OnEnumValueNotMatch: map_validator.SetMessage("Field '${field}' expected ${expected_type}, got ${actual_type} - must be one of the allowed values"),
+		},
+	})
+	
+	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+	}
+	_, err = check.RunValidate()
+	if err == nil {
+		t.Error("Expected error, but got no error")
+	}
+	expected := "Field 'status' expected string, got string - must be one of the allowed values"
+	if err.Error() != expected {
+		t.Errorf("Expected '%s', but we got '%s'", expected, err.Error())
+	}
+}
+
+func TestCustomEnumMessageWithHttpRequest(t *testing.T) {
+	// Test with HTTP JSON (integer enum) - demonstrates type coercion from float64 to int
+	payload := map[string]interface{}{"port": 999}
+	validRole := map_validator.BuildRoles().SetRule("port", map_validator.Rules{
+		Type: reflect.Int,
+		Enum: &map_validator.EnumField[any]{Items: []int{80, 443, 8080}},
+		CustomMsg: map_validator.CustomMsg{
+			OnEnumValueNotMatch: map_validator.SetMessage("Field '${field}' expected ${expected_type} but got ${actual_type} - port not allowed"),
+		},
+	})
+	
+	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+	}
+	_, err = check.RunValidate()
+	if err == nil {
+		t.Error("Expected error, but got no error")
+	}
+	expected := "Field 'port' expected int but got int - port not allowed"
+	if err.Error() != expected {
+		t.Errorf("Expected '%s', but we got '%s'", expected, err.Error())
+	}
+}
+
+func TestCustomEnumMessageTypeCoercion(t *testing.T) {
+	// Test to demonstrate type coercion with HTTP JSON - float64 input to int enum
+	// This shows when expected_type != actual_type
+	payload := map[string]interface{}{"priority": 5.0} // float64 from JSON
+	validRole := map_validator.BuildRoles().SetRule("priority", map_validator.Rules{
+		Type: reflect.Int,
+		Enum: &map_validator.EnumField[any]{Items: []int{1, 2, 3}}, // int enum
+		CustomMsg: map_validator.CustomMsg{
+			OnEnumValueNotMatch: map_validator.SetMessage("Priority '${field}': expected ${expected_type}, received ${actual_type}"),
+		},
+	})
+	
+	check, err := map_validator.NewValidateBuilder().SetRules(validRole).Load(payload)
+	if err != nil {
+		t.Errorf("Expected not have error, but got error : %s", err)
+	}
+	_, err = check.RunValidate()
+	if err == nil {
+		t.Error("Expected error, but got no error")
+	}
+	expected := "Priority 'priority': expected int, received float64"
+	if err.Error() != expected {
+		t.Errorf("Expected '%s', but we got '%s'", expected, err.Error())
+	}
+}
+
 func TestInvalidLengthMessageCaseOneT(t *testing.T) {
 	rolesss := map_validator.BuildRoles().
 		SetRule("project_id", map_validator.Rules{UUID: true}).
