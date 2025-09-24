@@ -59,7 +59,7 @@ func TestInvalidWordingList(t *testing.T) {
 		t.Error("Expected error, but got no error")
 	}
 
-	expectedError := "value in 'numbers' field should be integer"
+	expectedError := "the field 'numbers' should be integer"
 	if err != nil && err.Error() != expectedError {
 		t.Errorf("Expected error %s, but got: %s", expectedError, err)
 	}
@@ -120,7 +120,7 @@ func TestInvalidItemContentLenghtList(t *testing.T) {
 		t.Errorf("Expected error, but got no error")
 	}
 
-	expectedError := "value in 'numbers' field should be or greater than 10"
+	expectedError := "the field 'numbers' should be or greater than 10"
 	if err != nil && err.Error() != expectedError {
 		t.Errorf("Expected error %s, but got: %s", expectedError, err)
 	}
@@ -153,7 +153,7 @@ func TestInvalidStringItemContentLenghtList(t *testing.T) {
 		t.Errorf("Expected error, but got no error")
 	}
 
-	expectedError := "value in 'name' field should be or lower than 3"
+	expectedError := "the field 'name' should be or lower than 3"
 	if err != nil && err.Error() != expectedError {
 		t.Errorf("Expected error %s, but got: %s", expectedError, err)
 	}

@@ -308,19 +308,61 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 	return res, nil
 }
 
+// ValidateValue validates a single value against the given rules without field context
+// This is the core validation logic that can be reused for different scenarios
+// field parameter is optional - if not provided, "value" will be used in error messages
+func ValidateValue(data interface{}, validator Rules, dataFrom LoadFromType, field ...string) (interface{}, error) {
+	// Use provided field name or default to "value"
+	fieldName := "value"
+	if len(field) > 0 && field[0] != "" {
+		fieldName = field[0]
+	}
+
+	return validateValueInternal(data, validator, loadFromType(dataFrom), fieldName)
+}
+
 // validate is the core field validator used across the package and tests
 func validate(field string, dataTemp map[string]interface{}, validator Rules, dataFrom loadFromType) (interface{}, error) {
-	//var oldIntType reflect.Kind
-	data := dataTemp[field]
-	var sliceData []interface{}
-	//var isListObject bool
-
+	// Handle RequiredWithout and RequiredIf fields by setting Null to true
 	if len(validator.RequiredWithout) > 0 || len(validator.RequiredIf) > 0 {
 		validator.Null = true
 	}
 
+	// Extract the data value for the field
+	data := dataTemp[field]
+
+	// Use the internal validation function
+	return validateValueInternal(data, validator, dataFrom, field)
+}
+
+// buildErrorMessage creates a natural error message based on field name
+func buildErrorMessage(field string, message string) error {
+	if field == "value" {
+		// For default field, use more natural message without "field" prefix
+		return errors.New(message)
+	}
+	// For specific fields, use the traditional format
+	return errors.New("the field '" + field + "' " + message)
+}
+
+// buildErrorMessagef creates a natural error message with formatting
+func buildErrorMessagef(field string, format string, args ...interface{}) error {
+	message := fmt.Sprintf(format, args...)
+	if field == "value" {
+		return errors.New(message)
+	}
+	return fmt.Errorf("the field '%s' "+format, append([]interface{}{field}, args...)...)
+}
+
+// validateValueInternal contains the actual validation logic
+func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromType, field string) (interface{}, error) {
+	var sliceData []interface{}
+
 	// null validation
 	if !validator.Null && data == nil {
+		if field == "value" {
+			return nil, errors.New("value is required")
+		}
 		return nil, errors.New("we need '" + field + "' field")
 	} else if validator.Null && data == nil {
 		if !validator.NilIfNull && validator.IfNull != nil {
@@ -335,7 +377,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	//if validator.ListObject != nil {
 	//	res, err := toInterfaceSlice(data)
 	//	if err != nil {
-	//		return nil, errors.New("field '" + field + "' is not valid object")
+	//		return nil, buildErrorMessage(field, "is not valid object")
 	//	}
 	//	return res, nil
 	//}
@@ -352,7 +394,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	if validator.ListObject != nil && validator.List == nil {
 		s, ok := toInterfaceSlice(data)
 		if !ok {
-			return nil, errors.New("field '" + field + "' is not valid list object")
+			return nil, buildErrorMessage(field, "is not valid list object")
 		}
 		return s, nil
 	}
@@ -388,14 +430,14 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 				ActualType:   &dataType,
 			})
 		}
-		return nil, errors.New("the field '" + field + "' should be '" + validator.Type.String() + "'")
+		return nil, buildErrorMessage(field, "should be '"+validator.Type.String()+"'")
 	}
 
 	// Early list handling to avoid container-level regex/enum/type checks
 	if validator.List != nil {
 		sliceDataX, ok := toInterfaceSlice(data)
 		if !ok {
-			return nil, errors.New("field '" + field + "' is not valid list")
+			return nil, buildErrorMessage(field, "is not valid list")
 		}
 
 		// List of objects via Object rules or legacy ListObject
@@ -404,7 +446,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 			if validator.Object != nil {
 				for _, it := range sliceDataX {
 					if _, ok := it.(map[string]interface{}); !ok {
-						return nil, errors.New("field '" + field + "' is not valid list object")
+						return nil, buildErrorMessage(field, "is not valid list object")
 					}
 				}
 			}
@@ -440,12 +482,12 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 				if effectiveKind == reflect.String && gotKind == reflect.String {
 					if elementMinPtr != nil {
 						if int64(utf8.RuneCountInString(it.(string))) < *elementMinPtr {
-							return nil, fmt.Errorf("value in '%s' field should be or greater than %v", field, *elementMinPtr)
+							return nil, buildErrorMessagef(field, "should be or greater than %v", *elementMinPtr)
 						}
 					}
 					if elementMaxPtr != nil {
 						if int64(utf8.RuneCountInString(it.(string))) > *elementMaxPtr {
-							return nil, fmt.Errorf("value in '%s' field should be or lower than %v", field, *elementMaxPtr)
+							return nil, buildErrorMessagef(field, "should be or lower than %v", *elementMaxPtr)
 						}
 					}
 				}
@@ -483,10 +525,10 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 						num = 0
 					}
 					if elementMinPtr != nil && num < float64(*elementMinPtr) {
-						return nil, fmt.Errorf("value in '%s' field should be or greater than %v", field, *elementMinPtr)
+						return nil, buildErrorMessagef(field, "should be or greater than %v", *elementMinPtr)
 					}
 					if elementMaxPtr != nil && num > float64(*elementMaxPtr) {
-						return nil, fmt.Errorf("value in '%s' field should be or lower than %v", field, *elementMaxPtr)
+						return nil, buildErrorMessagef(field, "should be or lower than %v", *elementMaxPtr)
 					}
 				}
 			}
@@ -502,12 +544,12 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 					if isIntegerFamily(expectedKind) {
 						noun = "integer"
 					}
-					return nil, fmt.Errorf("value in '%s' field should be %s", field, noun)
+					return nil, buildErrorMessagef(field, "should be %s", noun)
 				}
 			}
 
-			tmpPayload := map[string]interface{}{field: it}
-			if _, err := validate(field, tmpPayload, tmpRule, dataFrom); err != nil {
+			// Recursive validation for each element
+			if _, err := validateValueInternal(it, tmpRule, dataFrom, field); err != nil {
 				return nil, err
 			}
 		}
@@ -521,10 +563,10 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 		}
 		listLen := int64(len(sliceDataX))
 		if minPtr != nil && listLen < *minPtr {
-			return nil, fmt.Errorf("the field '%s' should be or greater than %v", field, *minPtr)
+			return nil, buildErrorMessagef(field, "should be or greater than %v", *minPtr)
 		}
 		if maxPtr != nil && listLen > *maxPtr {
-			return nil, fmt.Errorf("the field '%s' should be or lower than %v", field, *maxPtr)
+			return nil, buildErrorMessagef(field, "should be or lower than %v", *maxPtr)
 		}
 		return sliceDataX, nil
 	}
@@ -539,7 +581,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 			if validator.CustomMsg.OnRegexString != nil {
 				return nil, buildMessage(*validator.CustomMsg.OnRegexString, MessageMeta{Field: &field})
 			}
-			return nil, errors.New("the field '" + field + "' should be string")
+			return nil, buildErrorMessage(field, "should be string")
 		}
 		regex, err := regexp.Compile(validator.RegexString)
 		if err != nil {
@@ -549,7 +591,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 			if validator.CustomMsg.OnRegexString != nil {
 				return nil, buildMessage(*validator.CustomMsg.OnRegexString, MessageMeta{Field: &field})
 			}
-			return nil, errors.New("the field '" + field + "' is not valid regex")
+			return nil, buildErrorMessage(field, "is not valid regex")
 		}
 		return data, nil
 	}
@@ -564,7 +606,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 				ActualType:   &actualType,
 			})
 		}
-		return fmt.Errorf("the field '%s' value is not in enum list%v", field, enumValues)
+		return buildErrorMessagef(field, "value is not in enum list%v", enumValues)
 	}
 
 	if validator.Enum != nil {
@@ -681,7 +723,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 						return data, nil
 					} else {
 						// Float has decimal part, cannot convert to integer enum
-						return nil, errors.New("the field '" + field + "' should be '" + enumType.Elem().Kind().String() + "'")
+						return nil, buildErrorMessage(field, "should be '"+enumType.Elem().Kind().String()+"'")
 					}
 				}
 			}
@@ -731,7 +773,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	}
 
 	if validator.UUID {
-		errMsg := errors.New("the field '" + field + "' it's not valid uuid")
+		errMsg := buildErrorMessage(field, "is not valid uuid")
 		stringUuid, ok := data.(string)
 		if !ok {
 			return nil, errMsg
@@ -748,12 +790,12 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 
 	if validator.Email {
 		if reflect.TypeOf(data).Kind() != reflect.String || !isEmail(data.(string)) {
-			return nil, errors.New("field " + field + " is not valid email")
+			return nil, buildErrorMessage(field, "is not valid email")
 		}
 	}
 
 	if validator.IPV4 {
-		errMsg := errors.New("the field '" + field + "' it's not valid IP")
+		errMsg := buildErrorMessage(field, "is not valid IP")
 		stringIp, ok := data.(string)
 		if !ok {
 			return nil, errMsg
@@ -765,7 +807,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	}
 
 	if validator.IPV4Network {
-		errMsg := errors.New("the field '" + field + "' it's not valid IP Network")
+		errMsg := buildErrorMessage(field, "is not valid IP Network")
 		stringIp, ok := data.(string)
 		if !ok {
 			return nil, errMsg
@@ -777,7 +819,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	}
 
 	if validator.IPv4OptionalPrefix {
-		errMsg := errors.New("the field '" + field + "' it's not valid IP")
+		errMsg := buildErrorMessage(field, "is not valid IP")
 		stringIp, ok := data.(string)
 		if !ok {
 			return nil, errMsg
@@ -816,7 +858,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	if validator.AnonymousObject || validator.Object != nil {
 		res, err := toMapStringInterface(data)
 		if err != nil {
-			return nil, errors.New("field '" + field + "' is not valid object")
+			return nil, buildErrorMessage(field, "is not valid object")
 		}
 		return res, nil
 	}
@@ -831,7 +873,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	if validator.Min != nil && data != nil {
 		var isErr bool
 		var actualLength int64
-		err := fmt.Errorf("the field '%s' should be or greater than %v", field, *validator.Min)
+		err := buildErrorMessagef(field, "should be or greater than %v", *validator.Min)
 		if reflect.String == dataType {
 			if total := utf8.RuneCountInString(data.(string)); int64(total) < *validator.Min {
 				isErr = true
@@ -867,7 +909,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	if validator.Max != nil && data != nil {
 		var isErr bool
 		var actualLength int64
-		err := fmt.Errorf("the field '%s' should be or lower than %v", field, *validator.Max)
+		err := buildErrorMessagef(field, "should be or lower than %v", *validator.Max)
 		if reflect.String == dataType {
 			if total := utf8.RuneCountInString(data.(string)); int64(total) > *validator.Max {
 				isErr = true
