@@ -8,13 +8,23 @@ var (
 	ErrUnsupportType     = errors.New("type is not support")
 )
 
-type loadFromType int
+type LoadFromType int
 
 const (
-	fromHttpJson loadFromType = iota
-	fromHttpMultipartForm
-	fromMapString
-	fromJSONEncoder
+	FromHttpJson LoadFromType = iota
+	FromHttpMultipartForm
+	FromMapString
+	FromJSONEncoder
+)
+
+// Keep backward compatibility with internal names
+type loadFromType = LoadFromType
+
+const (
+	fromHttpJson          = FromHttpJson
+	fromHttpMultipartForm = FromHttpMultipartForm
+	fromMapString         = FromMapString
+	fromJSONEncoder       = FromJSONEncoder
 )
 
 const (

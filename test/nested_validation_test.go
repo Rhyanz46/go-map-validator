@@ -409,7 +409,7 @@ func TestInvalidListMultiNestedValidation(t *testing.T) {
 		return
 	}
 	_, err = check.RunValidate()
-	expected := "field 'anak-anak' is not valid list object"
+	expected := "the field 'anak-anak' is not valid list object"
 	if err.Error() != expected {
 		t.Errorf("Expected :%s. But you got : %s", expected, err)
 	}
