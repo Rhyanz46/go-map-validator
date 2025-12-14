@@ -20,36 +20,198 @@ This guide provides:
 4. Ask questions if uncertain
 5. Never deviate from documented patterns
 
+### ⚡ Efficiency Mode for AI Agents
+
+**For quick/rapid development:**
+- **Skip CustomMsg** - Use default error messages to save time
+- **Basic validations only** - Type, Min, Max, required fields
+- **Simple error handling** - Just return err.Error()
+- **Skip manipulators** - Only add if specifically needed
+
+**For production-quality code:**
+- **Add CustomMsg** - For user-facing APIs and complex validations
+- **Complete validations** - Include all relevant rules
+- **Detailed error messages** - User-friendly explanations
+- **Use manipulators** - TrimValidation for all string fields
+
+**Example - Efficiency Mode:**
+```go
+// Quick implementation - no CustomMsg
+.SetRule("name", map_validator.Rules{
+    Type: reflect.String,
+    Max:  map_validator.SetTotal(255),
+})
+```
+
+**Example - Quality Mode:**
+```go
+// Production implementation - with CustomMsg
+.SetRule("name", map_validator.Rules{
+    Type:        reflect.String,
+    Max:         map_validator.SetTotal(255),
+    RegexString: constant.RegexExcludeSpecialChar,
+    CustomMsg: map_validator.CustomMsg{
+        OnMax:         map_validator.SetMessage("Name is too long (max 255 chars)"),
+        OnRegexString: common_utils.ToPointer("Name cannot contain special characters"),
+    },
+})
+```
+
+## 📦 Installation
+
+### Required Dependencies
+
+Add this import to your Go file:
+```go
+import "github.com/Rhyanz46/go-map-validator/map_validator"
+```
+
+### Install the Package
+```bash
+go get github.com/Rhyanz46/go-map-validator/map_validator
+```
+
+### Project Structure Setup
+
+**For Custom Utilities (Optional):**
+```
+your-project/
+├── go.mod
+├── pkg/
+│   └── map_validator_utils/
+│       └── utils.go          # Custom validation utilities (optional)
+```
+
+**Where to Use map_validator:**
+- **REST Controllers** - HTTP request handlers that accept JSON
+- **API Handlers** - Any function that processes HTTP requests
+- **Web Controllers** - Controllers serving web API endpoints
+
+**Where NOT to use map_validator:**
+- Service layer (business logic)
+- Repository layer (data access)
+- Model/Entity definitions
+- Utility functions
+
+### Setup Custom Utilities (Optional)
+
+**ONLY create if you need to use SetManipulator or SetFieldsManipulator. If not using manipulators, skip this step.**
+
+Create `pkg/map_validator_utils/utils.go` (only if needed):
+```go
+package map_validator_utils
+
+import (
+    "errors"
+    "your-project/pkg/string_utils" // Replace with your actual string utilities
+)
+
+func TrimValidation(data interface{}) (result interface{}, err error) {
+    strData, ok := data.(string)
+    if !ok {
+        return nil, errors.New("data is not string")
+    }
+    result = string_utils.CleanDashes(string_utils.TrimAndClean(strData))
+    return
+}
+```
+
+**When you need this:**
+- When using `.SetManipulator("field", map_validator_utils.TrimValidation)`
+- When using `.SetFieldsManipulator([]string{"field1", "field2"}, map_validator_utils.TrimValidation)`
+
+**When you DON'T need this:**
+- Basic validation without field manipulation
+- When not sanitizing input data
+- Quick development/prototype mode
+
+### Common Import Pattern
+```go
+import (
+    "github.com/gin-gonic/gin"
+    "github.com/Rhyanz46/go-map-validator/map_validator"
+    "reflect" // Required for type definitions
+    "your-project/pkg/gin_utils" // For consistent responses
+
+    // Import map_validator_utils ONLY if using SetManipulator
+    // "your-project/pkg/map_validator_utils"
+)
+```
+
+### Verification
+
+Test your installation with a simple validation:
+```go
+func TestInstallation(c *gin.Context) {
+    roles := map_validator.BuildRoles()
+        .SetRule("test", map_validator.Rules{
+            Type: reflect.String,
+            Max:  map_validator.SetTotal(10),
+        })
+
+    jsonDataRoles := map_validator.NewValidateBuilder().SetRules(roles)
+    jsonDataValidate, err := jsonDataRoles.LoadJsonHttp(c.Request)
+    if err != nil {
+        c.JSON(400, gin.H{"error": err.Error()})
+        return
+    }
+
+    c.JSON(200, gin.H{"message": "map_validator is working!"})
+}
+```
+
+If the test runs without import errors, your installation is successful!
+
 ## ⚠️ IMPORTANT RULES FOR AI/LLM
 
 ### 1. **USAGE SCOPE RESTRICTIONS**
-- **❌ NEVER** use `map_validator` in:
-  - Service layer (usecase)
-  - Repository layer
-  - Model/Entity structs
-  - Utility functions
-  - Shared validation logic
-  - Database operations
-- **✅ ONLY** use `map_validator` in:
-  - Controller layer (any folder containing HTTP handlers)
-  - HTTP request validation
 
-### 1.1 **FINDING THE CONTROLLER LAYER**
-```
-Common controller layer locations:
-- /app/v2/views/rest/          # REST API handlers
-- /app/v1/views/rest/          # REST API handlers
-- /app/controllers/           # Traditional controllers
-- /app/controller/           # Traditional controllers
-- /app/handlers/             # HTTP request handlers
-- /internal/http/            # Internal HTTP handlers
-- /api/handlers/             # API handlers
+**✅ ONLY use `map_validator` for:**
+- **HTTP Request Validation** - Validating incoming API requests
+- **REST Controllers** - Functions that handle HTTP endpoints
+- **API Handlers** - Any function processing HTTP requests with JSON bodies
+
+**❌ NEVER use `map_validator` for:**
+- **Service Layer** - Business logic and data processing
+- **Repository Layer** - Database operations
+- **Model/Entity Validation** - Struct validation at model level
+- **Internal Data Processing** - Validation between services
+- **Database Constraints** - Data integrity rules
+
+**Key Principle**: `map_validator` is for **INPUT VALIDATION** at the **BOUNDARY** of your system (HTTP layer), not for **BUSINESS VALIDATION** inside your system.
+
+**Examples of Correct Usage:**
+```go
+// ✅ CORRECT - HTTP handler validating incoming request
+func (h *UserHandler) CreateUser(c *gin.Context) {
+    roles := map_validator.BuildRoles()...
+    // Validate user input here
+}
+
+// ✅ CORRECT - API endpoint validating JSON payload
+func (h *ProductHandler) CreateProduct(c *gin.Context) {
+    roles := map_validator.BuildRoles()...
+    // Validate product data here
+}
 ```
 
-**IMPORTANT**: If you cannot identify the controller layer in the project, **ASK THE USER** before proceeding with map_validator implementation. Example questions:
-- "Where are the HTTP request handlers located in this project?"
-- "Which folder contains the controller/REST handlers?"
-- "What is the project structure for HTTP handlers?"
+**Examples of Wrong Usage:**
+```go
+// ❌ WRONG - Don't validate in service layer
+func (s *UserService) ProcessUser(data User) error {
+    // Validation should happen in controller layer
+}
+
+// ❌ WRONG - Don't validate in repository
+func (r *UserRepository) Save(user User) error {
+    // Assume data is already validated
+}
+```
+
+**If unsure where to place validation, ask yourself:**
+1. Is this function handling an HTTP request? → **Use map_validator**
+2. Is this processing business logic? → **Don't use map_validator**
+3. Is this accessing database? → **Don't use map_validator**
 
 ### 2. **VALIDATION PURPOSE**
 - **✅ VALID USES**:
@@ -133,13 +295,19 @@ HTTP Request → Controller (with map_validator) → Clean Data → Service Laye
   ```
 
 ## Table of Contents
-1. [Basic Validation Pattern](#basic-validation-pattern)
-2. [Field Types and Rules](#field-types-and-rules)
-3. [Manipulators](#manipulators)
-4. [Custom Messages](#custom-messages)
-5. [Complex Validations](#complex-validations)
-6. [Settings](#settings)
-7. [Error Handling](#error-handling)
+1. [Installation](#installation)
+2. [Basic Validation Pattern](#basic-validation-pattern)
+3. [LoadJsonHttp Method](#loadjsonhttp-method)
+4. [Validation Result Processing](#validation-result-processing)
+5. [The Bind Method](#the-bind-method)
+6. [Direct Data Access (Get Method)](#direct-data-access-get-method)
+7. [Advanced Validation Features](#advanced-validation-features)
+8. [Field Types and Rules](#field-types-and-rules)
+9. [Manipulators](#manipulators)
+10. [Custom Messages](#custom-messages)
+11. [Complex Validations](#complex-validations)
+12. [Settings](#settings)
+13. [Error Handling](#error-handling)
 
 ## Basic Validation Pattern
 
@@ -154,7 +322,7 @@ roles := map_validator.BuildRoles()
 // 2. Create validator
 jsonDataRoles := map_validator.NewValidateBuilder().SetRules(roles)
 
-// 3. Load from HTTP request
+// 3. Load JSON from HTTP request
 jsonDataValidate, err := jsonDataRoles.LoadJsonHttp(c.Request)
 if err != nil {
     c.JSON(http.StatusBadRequest, gin_utils.MessageResponse{Message: err.Error()})
@@ -171,6 +339,367 @@ if err != nil {
 // 5. Bind to struct
 var requestStruct RequestStruct
 jsonData.Bind(&requestStruct)
+```
+
+## LoadJsonHttp Method
+
+The `LoadJsonHttp` method is used to load and parse JSON data from HTTP requests. This is a critical step that validates the JSON structure before applying validation rules.
+
+### Basic Usage
+```go
+// Load JSON from HTTP request
+jsonDataValidate, err := jsonDataRoles.LoadJsonHttp(c.Request)
+if err != nil {
+    c.JSON(http.StatusBadRequest, gin_utils.MessageResponse{Message: err.Error()})
+    return
+}
+```
+
+### What LoadJsonHttp Does:
+1. **Parses JSON body** from HTTP request
+2. **Validates JSON syntax** - returns error for invalid JSON
+3. **Applies strict mode rules** (if enabled)
+4. **Prepares data for validation rules**
+5. **Returns validation builder** for next step
+
+### Common LoadJsonHttp Errors
+```go
+jsonDataValidate, err := jsonDataRoles.LoadJsonHttp(c.Request)
+if err != nil {
+    // Common errors:
+    // - Invalid JSON syntax
+    // - Missing required fields (in strict mode)
+    // - Unknown fields (in strict mode)
+    // - Invalid data types
+
+    c.JSON(http.StatusBadRequest, gin_utils.MessageResponse{
+        Message: err.Error(), // Will show specific error
+    })
+    return
+}
+```
+
+### LoadJsonHttp with Different HTTP Methods
+```go
+// For POST request (JSON body)
+jsonDataValidate, err := jsonDataRoles.LoadJsonHttp(c.Request)
+
+// For PUT/PATCH request (JSON body)
+jsonDataValidate, err := jsonDataRoles.LoadJsonHttp(c.Request)
+
+// For GET request - Don't use LoadJsonHttp
+// Use query parameters validation instead (not covered by map_validator)
+```
+
+### Important Notes
+- Always use `c.Request` as parameter
+- Must be called after creating validation builder
+- Must be called before `RunValidate()`
+- Returns error for malformed JSON immediately
+- Works with `gin.Context` from Gin framework
+
+## Validation Result Processing
+
+After successful validation, you have two options to access the validated data:
+1. **Bind to struct** (recommended for complex requests)
+2. **Direct access** (for simple cases)
+
+## The Bind Method
+
+Use the `Bind` method to map validated data to your struct (recommended approach).
+
+### Basic Binding
+```go
+// Define your request struct
+type CreateUserRequest struct {
+    Name     string `json:"name"`
+    Email    string `json:"email"`
+    Password string `json:"password"`
+    Age      int    `json:"age"`
+}
+
+// After validation, bind the data with error handling
+var request CreateUserRequest
+if err := jsonData.Bind(&request); err != nil {
+    c.JSON(http.StatusInternalServerError, gin_utils.MessageResponse{
+        Message: "Failed to process request data",
+    })
+    return
+}
+
+// Now you can use the validated data
+fmt.Printf("Name: %s, Email: %s", request.Name, request.Email)
+```
+
+### Common Bind Errors
+
+The `Bind` method can fail in these scenarios:
+```go
+if err := jsonData.Bind(&request); err != nil {
+    // Common bind errors:
+    // - Type assertion errors (e.g., string field cannot be converted to int)
+    // - Missing required fields in struct
+    // - JSON structure mismatch
+    // - Invalid data conversion
+
+    c.JSON(http.StatusInternalServerError, gin_utils.MessageResponse{
+        Message: "Failed to process request data",
+    })
+    return
+}
+```
+
+### Complete Bind Pattern
+```go
+// After successful validation
+jsonData, err := jsonDataValidate.RunValidate()
+if err != nil {
+    c.JSON(http.StatusBadRequest, gin_utils.MessageResponse{Message: err.Error()})
+    return
+}
+
+// Bind to struct with proper error handling
+var request CreateUserRequest
+if err := jsonData.Bind(&request); err != nil {
+    log.Errorf("Bind error: %v", err) // Log for debugging
+    c.JSON(http.StatusInternalServerError, gin_utils.MessageResponse{
+        Message: "Failed to process request data",
+    })
+    return
+}
+
+// Now safe to use the request struct
+h.userService.CreateUser(request)
+
+### Type Conversion Examples
+```go
+type CreateRegistryRequest struct {
+    Name        string  `json:"name"`
+    Description string  `json:"description"`
+    Public      bool    `json:"public"`
+    LimitSize   float64 `json:"limit_size"`
+    ProjectID   string  `json:"project_id"`
+}
+
+// After validation and binding
+var request CreateRegistryRequest
+jsonData.Bind(&request)
+
+// Access the data with correct types
+if request.Public {
+    // Registry is public
+}
+
+if request.LimitSize > 0 {
+    // Storage limit is set
+}
+```
+
+### Binding Nested Objects
+```go
+type WebhookRequest struct {
+    Name     string                 `json:"name"`
+    URL      string                 `json:"url"`
+    Config   map[string]interface{} `json:"config"`
+    Events   []string               `json:"events"`
+}
+
+var request WebhookRequest
+jsonData.Bind(&request)
+
+// Access nested data
+if timeout, ok := request.Config["timeout"].(float64); ok {
+    // Use timeout value
+}
+```
+
+## Direct Data Access (Get Method)
+
+For simple cases or when you need to access specific fields without creating a struct, use the `Get()` method.
+
+### Basic Get Usage
+```go
+// After validation
+jsonData, err := jsonDataValidate.RunValidate()
+if err != nil {
+    // handle error
+}
+
+// Get individual fields
+name := jsonData.Get("name").(string)
+age := int(jsonData.Get("age").(float64)) // Numbers are float64 by default
+isPublic := jsonData.Get("public").(bool)
+
+fmt.Printf("Name: %s, Age: %d, Public: %t", name, age, isPublic)
+```
+
+### Type Assertions
+```go
+// Always assert to the correct type
+stringValue := jsonData.Get("field_name").(string)
+intValue := int(jsonData.Get("number_field").(float64))
+boolValue := jsonData.Get("bool_field").(bool)
+
+// For optional fields, check if nil
+if jsonData.Get("optional_field") != nil {
+    optionalValue := jsonData.Get("optional_field").(string)
+}
+```
+
+## Advanced Validation Features
+
+### 1. **RequiredIf - Conditional Requirements**
+Field is required only when another field is present:
+```go
+.SetRule("password", map_validator.Rules{
+    Type:      reflect.String,
+    Min:       map_validator.SetTotal(8),
+    Null:      true,
+    RequiredIf: []string{"confirm_password"}, // Required if confirm_password exists
+})
+```
+
+### 2. **IfNull - Default Values**
+Provide default values for optional fields:
+```go
+.SetRule("color", map_validator.Rules{
+    Type:        reflect.String,
+    RegexString: `^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$`,
+    Max:         map_validator.SetTotal(7),
+    Null:        true,
+    IfNull:      "#000000", // Default hex color
+})
+
+.SetRule("timeout", map_validator.Rules{
+    Type:   reflect.Int,
+    Min:    map_validator.SetTotal(5),
+    Max:    map_validator.SetTotal(300),
+    Null:   true,
+    IfNull: 30, // Default timeout: 30 seconds
+})
+```
+
+### 3. **Unique - Field Comparison**
+Ensure field value is different from another field:
+```go
+.SetRule("new_password", map_validator.Rules{
+    Type:   reflect.String,
+    Min:    map_validator.SetTotal(8),
+    Unique: []string{"old_password"}, // Must be different from old_password
+})
+```
+
+**Real-world Example from UpdateMyPassword:**
+```go
+func (h *restUser) UpdateMyPassword(c *gin.Context) {
+    // ...
+    data := user_controller.UpdateMemberPassword{}
+    jsonDataRoles := map_validator.NewValidateBuilder().SetRules(
+        map_validator.BuildRoles().
+            SetRule("old_password", map_validator.Rules{Type: reflect.String}).
+            SetRule("new_password", map_validator.Rules{
+                Type:   reflect.String,
+                Unique: []string{"old_password"}, // new_password must NOT equal old_password
+                Min:    map_validator.SetTotal(8),
+            }),
+    )
+    // ...
+}
+
+// Request JSON that will PASS validation:
+{
+    "old_password": "oldPass123",
+    "new_password": "newPass456"  // Different from old_password ✅
+}
+
+// Request JSON that will FAIL validation:
+{
+    "old_password": "oldPass123",
+    "new_password": "oldPass123"  // Same as old_password ❌
+}
+// Error: new_password must be different from old_password
+```
+
+**Important Note**: `Unique` means "must be different from", NOT "must be the same as". For confirmation fields where values should match, use business logic validation in the service layer instead.
+
+### 4. **IPV4 Validation**
+Validate IPv4 address format:
+```go
+.SetRule("ip_address", map_validator.Rules{
+    Type:  reflect.String,
+    IPV4:  true,
+    Max:   map_validator.SetTotal(15), // XXX.XXX.XXX.XXX format
+})
+
+// Field can be IP or other types
+.SetRule("target", map_validator.Rules{
+    Type: reflect.String,
+    IPV4: true,        // Can be IPv4 address
+    Null: true,        // Or can be null
+})
+```
+
+### 5. **List Validation**
+Validate arrays of values:
+```go
+// Array of strings with enum validation
+.SetRule("tags", map_validator.Rules{
+    Type: reflect.String,
+    List: map_validator.BuildListRoles()
+        .SetRule("[]", map_validator.Rules{
+            Enum: &map_validator.EnumField[any]{
+                Items: []string{"production", "staging", "development"},
+            },
+        }),
+})
+
+// Array of numbers
+.SetRule("scores", map_validator.Rules{
+    Type: reflect.String,
+    List: map_validator.BuildListRoles()
+        .SetRule("[]", map_validator.Rules{
+            Type: reflect.Float64,
+            Min:  map_validator.SetTotal(0),
+            Max:  map_validator.SetTotal(100),
+        }),
+})
+```
+
+### 6. **ListObject - Array of Objects**
+Validate array of objects:
+```go
+.SetRule("items", map_validator.Rules{
+    Type: reflect.String,
+    ListObject: map_validator.BuildRoles()
+        .SetRule("name", map_validator.Rules{
+            Type: reflect.String,
+            Max:  map_validator.SetTotal(100),
+        })
+        .SetRule("quantity", map_validator.Rules{
+            Type: reflect.Int,
+            Min:  map_validator.SetTotal(1),
+        })
+        .SetRule("price", map_validator.Rules{
+            Type: reflect.Float64,
+            Min:  map_validator.SetTotal(0),
+        }),
+})
+```
+
+### 7. **Multiple Custom Error Messages**
+Different messages for different validation failures:
+```go
+.SetRule("username", map_validator.Rules{
+    Type:        reflect.String,
+    Min:         map_validator.SetTotal(3),
+    Max:         map_validator.SetTotal(20),
+    RegexString: `^[a-zA-Z0-9_]+$`,
+    CustomMsg: map_validator.CustomMsg{
+        OnMin:         map_validator.SetMessage("Username must be at least 3 characters"),
+        OnMax:         map_validator.SetMessage("Username cannot exceed 20 characters"),
+        OnRegexString: map_validator.SetMessage("Username can only contain letters, numbers, and underscores"),
+    },
+})
 ```
 
 ## Field Types and Rules
@@ -367,11 +896,57 @@ func TrimValidation(data interface{}) (result interface{}, err error) {
 
 ## Custom Messages
 
-### Using common_utils.ToPointer
+> **Note**: Custom messages are **optional**. If not provided, map_validator will use default error messages. Use custom messages for better user experience and clearer error descriptions.
+
+### Basic Validation (Without Custom Messages)
+
 ```go
-CustomMsg: map_validator.CustomMsg{
-    OnRegexString: common_utils.ToPointer("the name field should not contains special character and space"),
-}
+// ✅ VALID - Custom messages are optional
+.SetRule("name", map_validator.Rules{
+    Type: reflect.String,
+    Max:  map_validator.SetTotal(255),
+})
+// Will use default error message: "name must not be greater than 255"
+
+.SetRule("email", map_validator.Rules{
+    Type:        reflect.String,
+    RegexString: `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`,
+})
+// Will use default error message: "email format is invalid"
+```
+
+### Using common_utils.ToPointer (Pattern from codebase)
+
+**From registry.go - Real Example:**
+```go
+.SetRule("name", map_validator.Rules{
+    Type:        reflect.String,
+    Max:         map_validator.SetTotal(255),
+    RegexString: constant.RegexExcludeSpecialCharSpace,
+    CustomMsg: map_validator.CustomMsg{
+        OnRegexString: common_utils.ToPointer("the name field should not contains special character and space"),
+    },
+})
+```
+
+**More examples from actual code:**
+```go
+// From tag.go
+.SetRule("repo_pattern", map_validator.Rules{
+    Type:        reflect.String,
+    RegexString: constant.RegexExcludeSpecialCharSpace,
+    CustomMsg: map_validator.CustomMsg{
+        OnRegexString: common_utils.ToPointer("Repository pattern should not contains special character and space"),
+    },
+})
+
+// From registryHandler.go
+.SetRule("color", map_validator.Rules{
+    RegexString: `^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$`,
+    CustomMsg: map_validator.CustomMsg{
+        OnRegexString: map_validator.SetMessage("Color field should be in hex format"),
+    },
+})
 ```
 
 ### Using map_validator.SetMessage
@@ -384,10 +959,103 @@ CustomMsg: map_validator.CustomMsg{
 ### Multiple Custom Messages
 ```go
 CustomMsg: map_validator.CustomMsg{
-    OnMin:   map_validator.SetMessage("Value is too small"),
-    OnMax:   map_validator.SetMessage("Value exceeds maximum allowed"),
-    OnRegex: map_validator.SetMessage("Invalid format"),
+    OnMin:         map_validator.SetMessage("Username must be at least 3 characters"),
+    OnMax:         map_validator.SetMessage("Username cannot exceed 20 characters"),
+    OnRegexString: map_validator.SetMessage("Username can only contain letters, numbers, and underscores"),
 }
+```
+
+### Available Custom Message Types
+```go
+CustomMsg: map_validator.CustomMsg{
+    OnType:        map_validator.SetMessage("Field type is invalid"),           // When type mismatch
+    OnMin:         map_validator.SetMessage("Value is too small"),              // When value < min
+    OnMax:         map_validator.SetMessage("Value exceeds maximum"),           // When value > max
+    OnRegexString: map_validator.SetMessage("Format is invalid"),               // When regex fails
+    OnEnum:        map_validator.SetMessage("Value not in allowed list"),       // When enum validation fails
+    OnNull:        map_validator.SetMessage("Field cannot be null"),           // When null not allowed
+    OnRequired:    map_validator.SetMessage("Field is required"),              // When field missing
+    OnRequiredIf:  map_validator.SetMessage("Field required when X is present"), // When RequiredIf fails
+    OnUnique:      map_validator.SetMessage("Field must be different from X"),   // When Unique fails
+}
+```
+
+### Best Practices for Custom Messages
+
+#### 1. **Use common_utils.ToPointer for consistency** (Recommended in this codebase)
+```go
+// ✅ PREFERRED - Consistent with project patterns
+CustomMsg: map_validator.CustomMsg{
+    OnRegexString: common_utils.ToPointer("the name field should not contains special character and space"),
+}
+
+// ✅ ALSO OK - Using SetMessage
+CustomMsg: map_validator.CustomMsg{
+    OnRegexString: map_validator.SetMessage("Color field should be in hex format"),
+}
+```
+
+#### 2. **Write User-Friendly Messages**
+```go
+// ❌ BAD - Technical jargon
+OnRegexString: map_validator.SetMessage("Regex validation failed")
+
+// ✅ GOOD - User understands
+OnRegexString: map_validator.SetMessage("Name can only contain letters and numbers")
+```
+
+#### 3. **Be Specific About Requirements**
+```go
+// ❌ VAGUE
+OnMin: map_validator.SetMessage("Invalid value")
+
+// ✅ SPECIFIC
+OnMin: map_validator.SetMessage("Password must be at least 8 characters long")
+OnMax: map_validator.SetMessage("Username cannot exceed 20 characters")
+```
+
+#### 4. **Consistent Message Format**
+```go
+// Use consistent format across your project
+"OnRegexString: common_utils.ToPointer("the [field] field should not contains special character")
+"OnRegexString: common_utils.ToPointer("Repository pattern should not contains special character and space")
+```
+
+### When to Use Custom Messages
+
+#### ✅ **Use Custom Messages When:**
+- **User-facing fields** - Help users understand what went wrong
+- **Complex validation** - Regex patterns need explanation
+- **Business requirements** - Specific rules that need clarity
+- **Consistency** - Maintain consistent error format across API
+
+```go
+// Example: User registration form
+.SetRule("password", map_validator.Rules{
+    Type: reflect.String,
+    Min:  map_validator.SetTotal(8),
+    Max:  map_validator.SetTotal(64),
+    RegexString: `^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]`,
+    CustomMsg: map_validator.CustomMsg{
+        OnMin:         map_validator.SetMessage("Password must be at least 8 characters"),
+        OnRegexString: map_validator.SetMessage("Password must contain uppercase, lowercase, number, and special character"),
+    },
+})
+```
+
+#### ✅ **Skip Custom Messages When:**
+- **Internal APIs** - Technical audience understands default errors
+- **Simple validation** - Obvious requirements (email format, etc.)
+- **Prototype/MVP** - Quick development, can add later
+- **Standard CRUD** - Basic operations don't need special messages
+
+```go
+// Example: Internal admin operation
+.SetRule("internal_id", map_validator.Rules{
+    Type: reflect.String,
+    Max:  map_validator.SetTotal(50),
+    // No CustomMsg - default message is fine for internal use
+})
 ```
 
 ## Complex Validations
@@ -1003,16 +1671,35 @@ if exists {
 
 ## SUMMARY OF RULES
 
+### Architectural Rules
 1. **Scope**: Only in controller layer for HTTP requests
 2. **Purpose**: Input sanitization and format checking
 3. **No sharing**: Define validation inline, no shared functions
 4. **No business logic**: Keep it simple and fast
-5. **Consistent errors**: Direct error messages, no wrapping
-6. **Performance**: Lightweight operations only
-7. **Architecture**: Clear separation between validation and business logic
+5. **Architecture**: Clear separation between validation and business logic
+
+### Implementation Rules
+6. **Consistent errors**: Direct error messages, no wrapping
+7. **Performance**: Lightweight operations only
 8. **Security**: Sanitize inputs, validate enums, use UUID for IDs
 9. **Consistency**: Same patterns across all endpoints
-10. **Simplicity**: Avoid overly complex nested validations
+10. **Simplicity**: Avoid overly complex nested validations (max 3 levels recommended)
+
+### Advanced Features Usage
+11. **RequiredIf**: For conditional field requirements
+12. **IfNull**: For default values on optional fields
+13. **Unique**: For field-to-field comparisons
+14. **IPV4**: For IP address validation
+15. **List/ListObject**: For array validation
+16. **Multiple CustomMsg**: For different error types
+
+### Data Access Patterns
+17. **Bind Method**: Use for complex requests (recommended)
+18. **Get Method**: Use for simple cases or direct field access
+19. **Type Assertions**: Always assert to correct types
+20. **Optional Fields**: Check for nil before accessing
+21. **Bind Error Handling**: Always handle Bind method errors properly
+22. **Log Bind Errors**: Log bind errors for debugging but return generic message to client
 
 ## Common Constants Used
 
