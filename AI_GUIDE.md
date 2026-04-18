@@ -20,6 +20,137 @@ This guide provides:
 4. Ask questions if uncertain
 5. Never deviate from documented patterns
 
+## 🎯 DEFAULT PLACEMENT RULE — STRICT BY DEFAULT
+
+> **Ini aturan paling penting untuk AI agent. Baca sampai tuntas sebelum menulis kode apapun yang pakai map_validator.**
+
+### Aturan default
+
+`map_validator` **hanya boleh dipakai di input boundary layer**. Nama layer ini beda-beda per konvensi project, semuanya merujuk ke hal yang sama:
+
+- **Controller** (MVC)
+- **View / REST view** (MVC-REST)
+- **Handler / HTTP handler** (Go idiom)
+- **Representation / Delivery / Interface adapter** (Clean Architecture)
+- **Transport** (Hexagonal / DDD)
+
+Semua istilah di atas merujuk ke: **kode yang menerima HTTP request mentah dan menerjemahkannya jadi data domain**. Itu satu-satunya tempat map_validator.
+
+### Default behavior AI agent
+
+Ketika user minta tambah validasi pakai `map_validator`:
+
+1. **Cari dulu input boundary layer-nya.** Path umum: `/app/.../rest/`, `/internal/http/`, `/api/handlers/`, `/controller/`, `/views/`.
+2. **Letakkan validasi di sana.** Bukan di service, repository, usecase, model, utility, atau domain package.
+3. **Kalau tidak ketemu boundary layer-nya**, STOP dan TANYA user di mana handler HTTP-nya. Jangan tebak.
+
+### Kalau user eksplisit minta di luar boundary
+
+User boleh override default (misal script yang baca file, consumer queue, CLI tool, migration).
+
+Dalam kasus itu AI boleh lanjut **tapi wajib**:
+- Konfirmasi override dalam 1 kalimat: "Okay, saya taruh di `cmd/` karena itu input boundary untuk CLI tool ini."
+- Pastikan target masih berperan sebagai **input boundary** untuk subsistemnya — map_validator untuk sanitasi input eksternal, apapun transportnya.
+- **Tetap tolak** kalau target adalah business logic internal. Walaupun user minta, validasi di service layer adalah salah tempat, bukan beda transport.
+
+### Anti-patterns yang AI wajib tolak atau tanya balik
+
+| Permintaan user | Respon AI |
+|---|---|
+| "Tambahin map_validator di service ini" | TANYA: "Ini di service layer. Validasinya biasanya di controller yang panggil service ini — mau saya taruh di sana?" |
+| "Validate di repository sebelum save" | TOLAK: "Repository sebaiknya trust input-nya. Saya taruh validasi di controller boundary." |
+| "Validate DTO di package model" | TOLAK: "Validasi model seharusnya business rule, bukan input format. map_validator dipakai di HTTP handler yang construct DTO-nya." |
+| "Validate di helper utility" | TANYA: "Siapa yang panggil helper ini? Kalau controller, validasi-nya di controller langsung." |
+
+### Decision tree cepat (AI wajib jalankan sebelum koding)
+
+1. **Target function baca dari `http.Request` / `gin.Context` / `echo.Context` / `fiber.Ctx` / equivalent?**
+   - YA → benar layer-nya. Lanjut.
+   - TIDAK → ke 2.
+
+2. **Target baca dari external input lain (CLI args, file, queue message, webhook payload)?**
+   - YA → ini input boundary untuk transport-nya. Lanjut, tapi catat konteksnya ke user.
+   - TIDAK → ke 3.
+
+3. **Target hanya dipanggil oleh kode yang inputnya sudah tervalidasi?**
+   - YA → STOP. Jangan pakai map_validator di sini. Arahkan user ke boundary yang memanggil.
+   - RAGU → TANYA user.
+
+### Kenapa aturan ini penting
+
+- **Single responsibility**: validasi menjaga boundary sistem. Taruh lebih dalam = duplikasi + bug saat beberapa controller panggil service yang sama.
+- **Performance**: kode internal trust data yang sudah tervalidasi. Re-validate di business logic buang siklus.
+- **Clean architecture**: aturan bentuk HTTP (string, enum, regex) tidak relevan di domain.
+- **Test clarity**: controller test verifikasi kontrak input; service test verifikasi business logic. Gabung keduanya = kegagalan sulit dibaca.
+
+## ✅ BEST PRACTICES CHECKLIST
+
+> **Konvensi:**
+> - **MUST** = wajib, tidak boleh ditawar. AI yang melanggar harus revisi.
+> - **SHOULD** = strongly recommended. Boleh dilewat hanya dengan alasan eksplisit dari user.
+>
+> Checklist ini untuk **production-quality code**. Untuk prototype cepat, lihat "Efficiency Mode" di bawah.
+
+### 🔐 Security defaults
+
+1. **MUST set `Max` di semua string field.** String tanpa Max = DoS gate. Default aman: `Str().WithMax(255)`, `Str().WithMax(1000)` untuk description panjang. Jangan biarkan tanpa batas.
+2. **MUST pakai `UUID()` untuk semua ID eksternal** — path param UUID, body `id`, foreign key. Jangan pakai `Str()` untuk ID.
+3. **MUST pakai `StrEnum()` / `IntEnum()` untuk field dengan nilai terbatas** — role, status, type, category. Jangan regex bebas yang bisa bocor.
+4. **SHOULD pasang manipulator `TrimValidation`** untuk semua string input user-facing — sanitasi default.
+5. **MUST NOT validate password strength di map_validator.** Hanya length (Min/Max). Regex complexity = service layer.
+
+### 📐 Code style & konsistensi
+
+6. **MUST pakai `ValidateJSON[T]`** untuk pattern biasa (validate + bind JSON body). Jangan tulis pipeline 5-langkah kecuali butuh akses `GetFilledField()` / custom logic pre-bind.
+7. **MUST pakai short constructors** (`Email()`, `UUID()`, `Str().WithMax(n)`, dst). Struct literal `Rules{...}` hanya kalau field yang dibutuhkan belum ada short helper-nya.
+8. **SHOULD extract rules ke package-level var** kalau dipakai 2+ handler. Inline acceptable kalau hanya 1 handler.
+9. **SHOULD naming convention**: `<Action><Resource>Rules` — `CreateUserRules`, `UpdateRegistryRules`, `ListMembersRules`.
+10. **SHOULD file organization**: rules di `rules/<resource>.go` terpisah dari handler. Handler import rules, bukan deklarasi inline.
+
+### 🧠 Validation vs business logic
+
+11. **MUST NOT: business rule di map_validator.** Kalau validasi butuh query DB / call API / cek state → itu service layer, bukan validator.
+12. **SHOULD batasi nesting max 3 level.** Lebih dalam → restructure DTO, split endpoint, atau pakai reference ID.
+13. **MUST NOT: side effect di manipulator.** Manipulator = pure function (input → output). Tidak boleh write DB, log, panggil API.
+14. **MUST NOT: invent field validation** yang user tidak minta. AI sering "baik-hati" nambah validasi `created_at`, `id` auto-generated, timestamps internal — tolak. Tanya user kalau ragu.
+
+### 🎯 Handler flow template
+
+15. **MUST urutan handler konsisten:**
+    ```
+    1. Auth check (cek session/token)
+    2. Parse path params (UUID, dll)
+    3. Parse & validate body via ValidateJSON[T]
+    4. Authorization (permission check)
+    5. Panggil service/controller
+    6. Format response
+    ```
+    Urutan ini harus sama di setiap handler. Jangan bolak-balik.
+
+16. **MUST error response format konsisten.** Forward `err.Error()` apa adanya. Jangan wrap dengan prefix seperti `"Validation error: "`.
+
+17. **MUST NOT expose internal error ke client.** Untuk status 500, log error lengkap + return generic message (mis. `"internal server error"`). Client tidak perlu tahu stack trace.
+
+### 🧪 Testing
+
+18. **SHOULD tiap rule punya minimal 2 test**: happy path (valid) + unhappy path (invalid). Kalau AI tambah rule baru, AI tambah test-nya juga.
+19. **SHOULD test edge case**: empty body, null field, oversized string, wrong type, field tidak ada dalam payload.
+20. **SHOULD test struct bind** — pastikan JSON tag di struct match rule key. Bug paling umum: typo di tag atau salah key.
+
+### 📝 Documentation
+
+21. **SHOULD comment `// why`** untuk regex aneh, magic number, Max value yang tidak obvious. Jangan comment what (sudah keliatan dari kode); comment why.
+22. **SHOULD `CustomMsg` untuk user-facing API**, skip untuk internal endpoint. Over-message = maintenance burden + inkonsistensi.
+
+### 🚫 Anti-patterns — tolak saat lihat
+
+- Rules panjang inline di handler yang ada 2+ tempat pakai (ekstrak ke package-level var)
+- `Rules{Type: reflect.String, Email: true}` (redundant, pakai `Email()`)
+- `CustomMsg` di setiap field walaupun internal API (over-engineering)
+- Validasi bool `agree_terms == true` (itu business check — service layer)
+- Manipulator yang panggil DB lookup (side effect, no-go)
+- Nested 5+ level deep (restructure)
+
 ### ⚡ Efficiency Mode for AI Agents
 
 **For quick/rapid development:**

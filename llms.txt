@@ -1,0 +1,57 @@
+# go-map-validator
+
+> Declarative validation for Go maps and HTTP JSON/multipart payloads. Composable rules, nested and list-of-object support, bind back to struct. Rules are safe for shared use across handlers and goroutines.
+
+**Import:** `github.com/Rhyanz46/go-map-validator/map_validator`
+
+**Core pattern (preferred style):**
+
+```go
+rules := map_validator.BuildRoles().
+    SetRule("email", map_validator.Email().WithMax(255)).
+    SetRule("password", map_validator.Str().Between(8, 64)).
+    Done()
+
+req, err := map_validator.ValidateJSON[LoginRequest](httpReq, rules)
+if err != nil { /* forward as-is; handle ErrNoRules, ErrInvalidJsonFormat, or validation errors */ }
+// req is validated and bound into the typed struct
+```
+
+Framework-agnostic. Works with `net/http`, gin, echo, fiber. Rules are reusable as package-level vars.
+
+## Core API
+
+- [ValidateJSON one-liner](https://github.com/Rhyanz46/go-map-validator/blob/main/README.md#one-liner-for-json-handlers): `ValidateJSON[T](r *http.Request, rules RulesWrapper) (T, error)` — full Load → Validate → Bind pipeline in a single call
+- [Short constructors](https://github.com/Rhyanz46/go-map-validator/blob/main/map_validator/shortcuts.go): `Str`, `Int`, `Int64`, `Float64`, `Bool`, `Email`, `UUID`, `IPv4`, `StrEnum`, `IntEnum`, `NestedObject`, `ListOfObject`
+- [Chain helpers on Rules](https://github.com/Rhyanz46/go-map-validator/blob/main/map_validator/shortcuts.go): `.Nullable`, `.Default`, `.WithMin`, `.WithMax`, `.Between`, `.Regex`, `.WithMsg`, `.UniqueFrom`, `.WithRequiredIf`, `.WithRequiredWithout` (value-receiver, safe to chain)
+- [Builder](https://github.com/Rhyanz46/go-map-validator/blob/main/map_validator/roles_builder.go): `BuildRoles().SetRule(name, rule).SetSetting(...).Done()` — returns `RulesWrapper`, reusable across handlers and goroutines
+- [Advanced pipeline](https://github.com/Rhyanz46/go-map-validator/blob/main/map_validator/implements.go): `NewValidateBuilder().SetRules(rules).LoadJsonHttp(r) / Load(m) / LoadFormHttp(r)` then `.RunValidate()` then `.Bind(&dst)` — use when `ValidateJSON` is insufficient (e.g. need `GetFilledField`, `GetNullField`, custom logic pre-bind, extension hooks)
+- [Custom messages](https://github.com/Rhyanz46/go-map-validator/blob/main/README.md#custom-messages): `CustomMsg{OnMin, OnMax, OnRegexString, OnTypeNotMatch, OnUnique, OnEnumValueNotMatch}` with template vars `${field}`, `${actual_type}`, `${expected_type}`, `${actual_length}`, `${expected_min_length}`, `${expected_max_length}`, `${unique_origin}`, `${unique_target}`, `${actual_value}`, `${enum_values}`
+
+## Docs
+
+- [README](https://github.com/Rhyanz46/go-map-validator/blob/main/README.md): install, quick start, features list, HTTP integration, nested objects, list of objects, unique & conditional required, custom messages, manipulators, extensions, strict mode
+- [AI_GUIDE](https://github.com/Rhyanz46/go-map-validator/blob/main/AI_GUIDE.md): **read this first when generating validation code with AI agents** — strict placement rule (controller/view/handler layer only), default behavior, decision tree, 22-item best practices checklist (security, style, logic-vs-business, handler flow, testing, documentation), anti-patterns to refuse on sight
+- [CHANGELOG](https://github.com/Rhyanz46/go-map-validator/blob/main/CHANGELOG.md): version history, behavior changes, migration notes
+
+## Examples
+
+- [ExampleValidateJSON](https://github.com/Rhyanz46/go-map-validator/blob/main/test/example_validate_json_test.go): runnable HTTP handler pattern
+- [validate_json_test.go](https://github.com/Rhyanz46/go-map-validator/blob/main/test/validate_json_test.go): 13 scenarios — happy path, invalid JSON, missing field, type mismatch, empty rules, nil request, nested, shared rules across calls, concurrent, empty body, strict mode, default value, list of objects
+- [Test suite](https://github.com/Rhyanz46/go-map-validator/tree/main/test): nested validation, regex, required-if, required-without, unique values, manipulator, custom messages, integer family coercion, extension
+
+## Key rules for AI agents
+
+- **Placement**: use `map_validator` only at the HTTP input boundary (controller / view / handler / representation / transport layer). Never in service, repository, model, or utility code. If the boundary layer is unclear, ask the user.
+- **Preferred style**: `ValidateJSON[T]` + short constructors. Avoid `Rules{Type: reflect.String, Max: SetTotal(100)}` literals unless a field has no short helper.
+- **Always set `Max`** on string fields (DoS protection). Always use `UUID()` for external IDs. Always use `StrEnum()` / `IntEnum()` for fields with limited values.
+- **No business logic in rules.** No DB lookups, no API calls, no cross-system checks inside `map_validator`. Those belong in the service layer.
+- **Forward errors verbatim** — do not wrap `err.Error()` with prefixes.
+- **Empty rules**: `SetRules` does not panic. `Load*` returns `ErrNoRules`. Handle it as a normal error.
+
+## Optional
+
+- [CONTRIBUTING](https://github.com/Rhyanz46/go-map-validator/blob/main/CONTRIBUTING.md): contribution guide
+- [SECURITY](https://github.com/Rhyanz46/go-map-validator/blob/main/SECURITY.md): security policy
+- [Internals](https://github.com/Rhyanz46/go-map-validator/tree/main/map_validator): source files — `functions.go`, `implements.go`, `tree_chaining.go`, `helpers.go`, `shortcuts.go`
+- [Roadmap](https://github.com/Rhyanz46/go-map-validator/blob/main/README.md#roadmap): multi-error aggregation with field paths, URL params extraction, base64 validation, multipart file size limits, OpenAPI spec generator, multi-validator per field
