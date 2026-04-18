@@ -73,6 +73,8 @@ func buildMessage(msg string, meta MessageMeta) error {
 	expectedMaxLengthVar := "${expected_max_length}"
 	uniqueOriginVar := "${unique_origin}"
 	uniqueTargetVar := "${unique_target}"
+	actualValueVar := "${actual_value}"
+	enumValuesVar := "${enum_values}"
 	if strings.Contains(msg, fieldVar) {
 		if meta.Field != nil {
 			v := *meta.Field
@@ -121,19 +123,44 @@ func buildMessage(msg string, meta MessageMeta) error {
 			msg = strings.ReplaceAll(msg, uniqueTargetVar, v)
 		}
 	}
+	if strings.Contains(msg, actualValueVar) {
+		if meta.ActualValue != nil {
+			msg = strings.ReplaceAll(msg, actualValueVar, *meta.ActualValue)
+		}
+	}
+	if strings.Contains(msg, enumValuesVar) {
+		if meta.EnumValues != nil {
+			msg = strings.ReplaceAll(msg, enumValuesVar, *meta.EnumValues)
+		}
+	}
 	return errors.New(msg)
 }
 
-func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, data map[string]interface{}, rule Rules, loadedFrom loadFromType) (interface{}, error) {
+// wrapperRunState holds the mutable per-scope state used during a single
+// RunValidate call. It lives outside RulesWrapper so that rules can be shared
+// across handlers, reused across runs, and even self-referenced (recursive
+// Object rules) without state bleeding between scopes.
+type wrapperRunState struct {
+	filledField     []string
+	nullFields      []string
+	requiredWithout map[string][]string
+	requiredIf      map[string][]string
+}
+
+func newWrapperRunState() *wrapperRunState {
+	return &wrapperRunState{}
+}
+
+func validateRecursive(pChain ChainerType, wrapper RulesWrapper, state *wrapperRunState, key string, data map[string]interface{}, rule Rules, loadedFrom loadFromType) (interface{}, error) {
 	//child and parent chain
 	var res interface{}
 	var err error
-	chainKey := key
+	nodeKey := key
 	// Only use indexed keys for ListObject, not for primitive List
 	if rule.isList() && rule.ListObject != nil {
-		chainKey = fmt.Sprintf("%s[%d]", pChain.GetKey(), len(pChain.GetChildren())-1)
+		nodeKey = fmt.Sprintf("%s[%d]", pChain.GetKey(), len(pChain.GetChildren())-1)
 	}
-	cChain := pChain.AddChild().SetKey(chainKey)
+	cChain := pChain.AddChild().SetKey(nodeKey)
 	var endOfLoop bool
 	if wrapper != nil && wrapper.getSetting().Strict {
 		var allowedKeys []string
@@ -157,7 +184,7 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 		cChain.SetValue(res)
 	}
 
-	if wrapper != nil {
+	if wrapper != nil && state != nil {
 		// add unique values
 		if res != nil && len(rule.Unique) > 0 {
 			cChain.SetUniques(rule.Unique)
@@ -168,21 +195,13 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 			cChain.SetCustomMsg(&rule.CustomMsg)
 		}
 
-		// put filled and null fields
-		if wrapper.getFilledField() == nil {
-			wrapper.setFilledField(&[]string{})
-		}
-		if wrapper.getNullFields() == nil {
-			wrapper.setNullFields(&[]string{})
-		}
-
 		if res != nil {
-			wrapper.appendFilledField(key)
+			state.filledField = append(state.filledField, key)
 		} else {
-			wrapper.appendNullFields(key)
+			state.nullFields = append(state.nullFields, key)
 		}
 
-		if len(wrapper.getRules()) == len(*wrapper.getNullFields())+len(*wrapper.getFilledField()) {
+		if len(wrapper.getRules()) == len(state.nullFields)+len(state.filledField) {
 			endOfLoop = true
 		}
 
@@ -194,28 +213,24 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 	}
 
 	// put required without values
-	if wrapper != nil && len(rule.RequiredWithout) > 0 {
+	if state != nil && len(rule.RequiredWithout) > 0 {
+		if state.requiredWithout == nil {
+			state.requiredWithout = map[string][]string{}
+		}
 		for _, unique := range rule.RequiredWithout {
-			if wrapper.getRequiredWithout() == nil {
-				wrapper.setRequiredWithout(&map[string][]string{})
-			}
-
-			if _, exists := (*wrapper.getRequiredWithout())[unique]; !exists {
-				(*wrapper.getRequiredWithout())[unique] = []string{}
-			}
-			(*wrapper.getRequiredWithout())[unique] = append((*wrapper.getRequiredWithout())[unique], key)
+			state.requiredWithout[unique] = append(state.requiredWithout[unique], key)
 		}
 	}
 
-	if endOfLoop && wrapper != nil && wrapper.getRequiredWithout() != nil {
-		for _, field := range *wrapper.getNullFields() {
+	if endOfLoop && state != nil && state.requiredWithout != nil {
+		for _, field := range state.nullFields {
 			var required bool
-			dependenciesField := (*wrapper.getRequiredWithout())[field]
+			dependenciesField := state.requiredWithout[field]
 			if len(dependenciesField) == 0 {
 				continue
 			}
 			for _, XField := range dependenciesField {
-				if isDataInList(XField, *wrapper.getFilledField()) {
+				if isDataInList(XField, state.filledField) {
 					required = true
 				}
 			}
@@ -226,28 +241,24 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 	}
 
 	// put required if values
-	if wrapper != nil && len(rule.RequiredIf) > 0 {
+	if state != nil && len(rule.RequiredIf) > 0 {
+		if state.requiredIf == nil {
+			state.requiredIf = map[string][]string{}
+		}
 		for _, unique := range rule.RequiredIf {
-			if wrapper.getRequiredIf() == nil {
-				wrapper.setRequiredIf(&map[string][]string{})
-			}
-
-			if _, exists := (*wrapper.getRequiredIf())[unique]; !exists {
-				(*wrapper.getRequiredIf())[unique] = []string{}
-			}
-			(*wrapper.getRequiredIf())[unique] = append((*wrapper.getRequiredIf())[unique], key)
+			state.requiredIf[unique] = append(state.requiredIf[unique], key)
 		}
 	}
 
-	if endOfLoop && wrapper != nil && wrapper.getRequiredIf() != nil {
-		for _, field := range *wrapper.getFilledField() {
+	if endOfLoop && state != nil && state.requiredIf != nil {
+		for _, field := range state.filledField {
 			var required bool
-			dependenciesField := (*wrapper.getRequiredIf())[field]
+			dependenciesField := state.requiredIf[field]
 			if len(dependenciesField) == 0 {
 				continue
 			}
 			for _, XField := range dependenciesField {
-				if !isDataInList(XField, *wrapper.getNullFields()) {
+				if !isDataInList(XField, state.nullFields) {
 					required = true
 				}
 			}
@@ -259,8 +270,9 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 
 	// if list
 	if rule.Object != nil && res != nil {
+		innerState := newWrapperRunState()
 		for keyX, ruleX := range rule.Object.getRules() {
-			_, err = validateRecursive(cChain, rule.Object, keyX, res.(map[string]interface{}), ruleX, fromJSONEncoder)
+			_, err = validateRecursive(cChain, rule.Object, innerState, keyX, res.(map[string]interface{}), ruleX, fromJSONEncoder)
 			if err != nil {
 				return nil, err
 			}
@@ -274,8 +286,9 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 			if m, ok := xRes.(map[string]interface{}); ok {
 				// Validate as object with the provided child rules
 				tmpChain := newChainer().SetKey(chainKey)
+				itemState := newWrapperRunState()
 				for keyX, ruleX := range rule.ListObject.getRules() {
-					_, err = validateRecursive(tmpChain, rule.ListObject, keyX, m, ruleX, fromJSONEncoder)
+					_, err = validateRecursive(tmpChain, rule.ListObject, itemState, keyX, m, ruleX, fromJSONEncoder)
 					if err != nil {
 						return nil, err
 					}
@@ -308,19 +321,61 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 	return res, nil
 }
 
+// ValidateValue validates a single value against the given rules without field context
+// This is the core validation logic that can be reused for different scenarios
+// field parameter is optional - if not provided, "value" will be used in error messages
+func ValidateValue(data interface{}, validator Rules, dataFrom LoadFromType, field ...string) (interface{}, error) {
+	// Use provided field name or default to "value"
+	fieldName := "value"
+	if len(field) > 0 && field[0] != "" {
+		fieldName = field[0]
+	}
+
+	return validateValueInternal(data, validator, loadFromType(dataFrom), fieldName)
+}
+
 // validate is the core field validator used across the package and tests
 func validate(field string, dataTemp map[string]interface{}, validator Rules, dataFrom loadFromType) (interface{}, error) {
-	//var oldIntType reflect.Kind
-	data := dataTemp[field]
-	var sliceData []interface{}
-	//var isListObject bool
-
+	// Handle RequiredWithout and RequiredIf fields by setting Null to true
 	if len(validator.RequiredWithout) > 0 || len(validator.RequiredIf) > 0 {
 		validator.Null = true
 	}
 
+	// Extract the data value for the field
+	data := dataTemp[field]
+
+	// Use the internal validation function
+	return validateValueInternal(data, validator, dataFrom, field)
+}
+
+// buildErrorMessage creates a natural error message based on field name
+func buildErrorMessage(field string, message string) error {
+	if field == "value" {
+		// For default field, use more natural message without "field" prefix
+		return errors.New(message)
+	}
+	// For specific fields, use the traditional format
+	return errors.New("the field '" + field + "' " + message)
+}
+
+// buildErrorMessagef creates a natural error message with formatting
+func buildErrorMessagef(field string, format string, args ...interface{}) error {
+	message := fmt.Sprintf(format, args...)
+	if field == "value" {
+		return errors.New(message)
+	}
+	return fmt.Errorf("the field '%s' "+format, append([]interface{}{field}, args...)...)
+}
+
+// validateValueInternal contains the actual validation logic
+func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromType, field string) (interface{}, error) {
+	var sliceData []interface{}
+
 	// null validation
 	if !validator.Null && data == nil {
+		if field == "value" {
+			return nil, errors.New("value is required")
+		}
 		return nil, errors.New("we need '" + field + "' field")
 	} else if validator.Null && data == nil {
 		if !validator.NilIfNull && validator.IfNull != nil {
@@ -335,7 +390,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	//if validator.ListObject != nil {
 	//	res, err := toInterfaceSlice(data)
 	//	if err != nil {
-	//		return nil, errors.New("field '" + field + "' is not valid object")
+	//		return nil, buildErrorMessage(field, "is not valid object")
 	//	}
 	//	return res, nil
 	//}
@@ -352,7 +407,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	if validator.ListObject != nil && validator.List == nil {
 		s, ok := toInterfaceSlice(data)
 		if !ok {
-			return nil, errors.New("field '" + field + "' is not valid list object")
+			return nil, buildErrorMessage(field, "is not valid list object")
 		}
 		return s, nil
 	}
@@ -388,14 +443,14 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 				ActualType:   &dataType,
 			})
 		}
-		return nil, errors.New("the field '" + field + "' should be '" + validator.Type.String() + "'")
+		return nil, buildErrorMessage(field, "should be '"+validator.Type.String()+"'")
 	}
 
 	// Early list handling to avoid container-level regex/enum/type checks
 	if validator.List != nil {
 		sliceDataX, ok := toInterfaceSlice(data)
 		if !ok {
-			return nil, errors.New("field '" + field + "' is not valid list")
+			return nil, buildErrorMessage(field, "is not valid list")
 		}
 
 		// List of objects via Object rules or legacy ListObject
@@ -404,7 +459,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 			if validator.Object != nil {
 				for _, it := range sliceDataX {
 					if _, ok := it.(map[string]interface{}); !ok {
-						return nil, errors.New("field '" + field + "' is not valid list object")
+						return nil, buildErrorMessage(field, "is not valid list object")
 					}
 				}
 			}
@@ -440,12 +495,12 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 				if effectiveKind == reflect.String && gotKind == reflect.String {
 					if elementMinPtr != nil {
 						if int64(utf8.RuneCountInString(it.(string))) < *elementMinPtr {
-							return nil, fmt.Errorf("value in '%s' field should be or greater than %v", field, *elementMinPtr)
+							return nil, buildErrorMessagef(field, "should be or greater than %v", *elementMinPtr)
 						}
 					}
 					if elementMaxPtr != nil {
 						if int64(utf8.RuneCountInString(it.(string))) > *elementMaxPtr {
-							return nil, fmt.Errorf("value in '%s' field should be or lower than %v", field, *elementMaxPtr)
+							return nil, buildErrorMessagef(field, "should be or lower than %v", *elementMaxPtr)
 						}
 					}
 				}
@@ -483,10 +538,10 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 						num = 0
 					}
 					if elementMinPtr != nil && num < float64(*elementMinPtr) {
-						return nil, fmt.Errorf("value in '%s' field should be or greater than %v", field, *elementMinPtr)
+						return nil, buildErrorMessagef(field, "should be or greater than %v", *elementMinPtr)
 					}
 					if elementMaxPtr != nil && num > float64(*elementMaxPtr) {
-						return nil, fmt.Errorf("value in '%s' field should be or lower than %v", field, *elementMaxPtr)
+						return nil, buildErrorMessagef(field, "should be or lower than %v", *elementMaxPtr)
 					}
 				}
 			}
@@ -502,12 +557,12 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 					if isIntegerFamily(expectedKind) {
 						noun = "integer"
 					}
-					return nil, fmt.Errorf("value in '%s' field should be %s", field, noun)
+					return nil, buildErrorMessagef(field, "should be %s", noun)
 				}
 			}
 
-			tmpPayload := map[string]interface{}{field: it}
-			if _, err := validate(field, tmpPayload, tmpRule, dataFrom); err != nil {
+			// Recursive validation for each element
+			if _, err := validateValueInternal(it, tmpRule, dataFrom, field); err != nil {
 				return nil, err
 			}
 		}
@@ -521,10 +576,10 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 		}
 		listLen := int64(len(sliceDataX))
 		if minPtr != nil && listLen < *minPtr {
-			return nil, fmt.Errorf("the field '%s' should be or greater than %v", field, *minPtr)
+			return nil, buildErrorMessagef(field, "should be or greater than %v", *minPtr)
 		}
 		if maxPtr != nil && listLen > *maxPtr {
-			return nil, fmt.Errorf("the field '%s' should be or lower than %v", field, *maxPtr)
+			return nil, buildErrorMessagef(field, "should be or lower than %v", *maxPtr)
 		}
 		return sliceDataX, nil
 	}
@@ -539,7 +594,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 			if validator.CustomMsg.OnRegexString != nil {
 				return nil, buildMessage(*validator.CustomMsg.OnRegexString, MessageMeta{Field: &field})
 			}
-			return nil, errors.New("the field '" + field + "' should be string")
+			return nil, buildErrorMessage(field, "should be string")
 		}
 		regex, err := regexp.Compile(validator.RegexString)
 		if err != nil {
@@ -549,7 +604,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 			if validator.CustomMsg.OnRegexString != nil {
 				return nil, buildMessage(*validator.CustomMsg.OnRegexString, MessageMeta{Field: &field})
 			}
-			return nil, errors.New("the field '" + field + "' is not valid regex")
+			return nil, buildErrorMessage(field, "is not valid regex")
 		}
 		return data, nil
 	}
@@ -558,13 +613,17 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	buildEnumErrorMessage := func(enumValues interface{}, enumType reflect.Type, actualType reflect.Kind) error {
 		if validator.CustomMsg.OnEnumValueNotMatch != nil {
 			expectedType := enumType.Elem().Kind()
+			actualValue := fmt.Sprintf("%v", data)
+			enumValuesStr := fmt.Sprintf("%v", enumValues)
 			return buildMessage(*validator.CustomMsg.OnEnumValueNotMatch, MessageMeta{
 				Field:        &field,
 				ExpectedType: &expectedType,
 				ActualType:   &actualType,
+				ActualValue:  &actualValue,
+				EnumValues:   &enumValuesStr,
 			})
 		}
-		return fmt.Errorf("the field '%s' value is not in enum list%v", field, enumValues)
+		return buildErrorMessagef(field, "value is not in enum list%v", enumValues)
 	}
 
 	if validator.Enum != nil {
@@ -681,7 +740,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 						return data, nil
 					} else {
 						// Float has decimal part, cannot convert to integer enum
-						return nil, errors.New("the field '" + field + "' should be '" + enumType.Elem().Kind().String() + "'")
+						return nil, buildErrorMessage(field, "should be '"+enumType.Elem().Kind().String()+"'")
 					}
 				}
 			}
@@ -720,7 +779,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 					return nil, buildEnumErrorMessage(values, enumType, dataType)
 				}
 			default:
-				panic("not support type validatorType for enum value")
+				return nil, buildErrorMessagef(field, "enum is not supported for type '%s'", dataType.String())
 			}
 		}
 		return data, nil
@@ -731,7 +790,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	}
 
 	if validator.UUID {
-		errMsg := errors.New("the field '" + field + "' it's not valid uuid")
+		errMsg := buildErrorMessage(field, "is not valid uuid")
 		stringUuid, ok := data.(string)
 		if !ok {
 			return nil, errMsg
@@ -748,12 +807,12 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 
 	if validator.Email {
 		if reflect.TypeOf(data).Kind() != reflect.String || !isEmail(data.(string)) {
-			return nil, errors.New("field " + field + " is not valid email")
+			return nil, buildErrorMessage(field, "is not valid email")
 		}
 	}
 
 	if validator.IPV4 {
-		errMsg := errors.New("the field '" + field + "' it's not valid IP")
+		errMsg := buildErrorMessage(field, "is not valid IP")
 		stringIp, ok := data.(string)
 		if !ok {
 			return nil, errMsg
@@ -765,7 +824,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	}
 
 	if validator.IPV4Network {
-		errMsg := errors.New("the field '" + field + "' it's not valid IP Network")
+		errMsg := buildErrorMessage(field, "is not valid IP Network")
 		stringIp, ok := data.(string)
 		if !ok {
 			return nil, errMsg
@@ -777,7 +836,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	}
 
 	if validator.IPv4OptionalPrefix {
-		errMsg := errors.New("the field '" + field + "' it's not valid IP")
+		errMsg := buildErrorMessage(field, "is not valid IP")
 		stringIp, ok := data.(string)
 		if !ok {
 			return nil, errMsg
@@ -816,7 +875,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	if validator.AnonymousObject || validator.Object != nil {
 		res, err := toMapStringInterface(data)
 		if err != nil {
-			return nil, errors.New("field '" + field + "' is not valid object")
+			return nil, buildErrorMessage(field, "is not valid object")
 		}
 		return res, nil
 	}
@@ -831,7 +890,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	if validator.Min != nil && data != nil {
 		var isErr bool
 		var actualLength int64
-		err := fmt.Errorf("the field '%s' should be or greater than %v", field, *validator.Min)
+		err := buildErrorMessagef(field, "should be or greater than %v", *validator.Min)
 		if reflect.String == dataType {
 			if total := utf8.RuneCountInString(data.(string)); int64(total) < *validator.Min {
 				isErr = true
@@ -867,7 +926,7 @@ func validate(field string, dataTemp map[string]interface{}, validator Rules, da
 	if validator.Max != nil && data != nil {
 		var isErr bool
 		var actualLength int64
-		err := fmt.Errorf("the field '%s' should be or lower than %v", field, *validator.Max)
+		err := buildErrorMessagef(field, "should be or lower than %v", *validator.Max)
 		if reflect.String == dataType {
 			if total := utf8.RuneCountInString(data.(string)); int64(total) > *validator.Max {
 				isErr = true

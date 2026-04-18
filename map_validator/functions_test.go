@@ -38,7 +38,7 @@ func TestValidateInvalidUUID(t *testing.T) {
 		t.Errorf("Expected error, but got none")
 	}
 
-	expectedError := "the field 'field1' it's not valid uuid"
+	expectedError := "the field 'field1' is not valid uuid"
 	if err != nil && err.Error() != expectedError {
 		t.Errorf("Expected error: %s, got: %v", expectedError, err)
 	}
@@ -158,7 +158,7 @@ func TestValidateInvalidEmail(t *testing.T) {
 		t.Errorf("Expected error, but got none")
 	}
 
-	expectedError := "field email is not valid email"
+	expectedError := "the field 'email' is not valid email"
 	if err != nil && err.Error() != expectedError {
 		t.Errorf("Expected error: %s, got: %v", expectedError, err)
 	}
@@ -195,7 +195,7 @@ func TestValidateInvalidIPV4(t *testing.T) {
 		t.Errorf("Expected error, but got none")
 	}
 
-	expectedError := "the field 'ip_address' it's not valid IP"
+	expectedError := "the field 'ip_address' is not valid IP"
 	if err != nil && err.Error() != expectedError {
 		t.Errorf("Expected error: %s, got: %v", expectedError, err)
 	}

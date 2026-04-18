@@ -12,10 +12,6 @@ func NewValidateBuilder() *ruleState {
 }
 
 func (state *ruleState) SetRules(validations RulesWrapper) *dataState {
-	if len(validations.getRules()) == 0 {
-		panic("you need to set roles")
-	}
-
 	var tempExt []ExtensionType
 	state.rules = validations
 
@@ -54,6 +50,9 @@ func (state *ruleState) AddExtension(extension ExtensionType) *ruleState {
 //		return nil
 //	}
 func (state *dataState) Load(data map[string]interface{}) (*finalOperation, error) {
+	if state == nil || state.rules == nil || len(state.rules.getRules()) == 0 {
+		return nil, ErrNoRules
+	}
 	//if state.strictAllowedValue {
 	//	if err := state.checkStrictKeys(data); err != nil {
 	//		return nil, err
@@ -82,6 +81,9 @@ func (state *dataState) Load(data map[string]interface{}) (*finalOperation, erro
 func (state *dataState) LoadJsonHttp(r *http.Request) (*finalOperation, error) {
 	if state == nil {
 		return nil, errors.New("no data to Load because last progress is error")
+	}
+	if state.rules == nil || len(state.rules.getRules()) == 0 {
+		return nil, ErrNoRules
 	}
 	if r == nil {
 		return nil, errors.New("no data to Load")
@@ -122,6 +124,9 @@ func (state *dataState) LoadJsonHttp(r *http.Request) (*finalOperation, error) {
 func (state *dataState) LoadFormHttp(r *http.Request) (*finalOperation, error) {
 	if state == nil {
 		return nil, errors.New("no data to Load because last progress is error")
+	}
+	if state.rules == nil || len(state.rules.getRules()) == 0 {
+		return nil, ErrNoRules
 	}
 	if r == nil {
 		return nil, errors.New("no data to Load")
@@ -196,8 +201,9 @@ func (state *finalOperation) RunValidate() (*ExtraOperationData, error) {
 			return nil, err
 		}
 	}
+	topState := newWrapperRunState()
 	for key, rule := range state.rules.getRules() {
-		data, err := validateRecursive(initChain, state.rules, key, state.data, rule, state.loadedFrom)
+		data, err := validateRecursive(initChain, state.rules, topState, key, state.data, rule, state.loadedFrom)
 		if err != nil {
 			return nil, err
 		}

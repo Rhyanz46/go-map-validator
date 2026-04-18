@@ -213,6 +213,23 @@ func (r *UserRepository) Save(user User) error {
 2. Is this processing business logic? → **Don't use map_validator**
 3. Is this accessing database? → **Don't use map_validator**
 
+### 1.1 **FINDING THE CONTROLLER LAYER**
+```
+Common controller layer locations:
+- /app/v2/views/rest/          # REST API handlers
+- /app/v1/views/rest/          # REST API handlers
+- /app/controllers/           # Traditional controllers
+- /app/controller/           # Traditional controllers
+- /app/handlers/             # HTTP request handlers
+- /internal/http/            # Internal HTTP handlers
+- /api/handlers/             # API handlers
+```
+
+**IMPORTANT**: If you cannot identify the controller layer in the project, **ASK THE USER** before proceeding with map_validator implementation. Example questions:
+- "Where are the HTTP request handlers located in this project?"
+- "Which folder contains the controller/REST handlers?"
+- "What is the project structure for HTTP handlers?"
+
 ### 2. **VALIDATION PURPOSE**
 - **✅ VALID USES**:
   - Validating incoming HTTP requests
@@ -258,18 +275,29 @@ func (r *repository) Save(data Data) error {
 }
 ```
 
-### 4. **SHARED VALIDATION ANTI-PATTERN**
+### 4. **SHARING RULES ACROSS HANDLERS (SAFE SINCE STATE FIX)**
+
+> **Update:** rules tidak lagi menyimpan state mutable per-call. Pola sebelumnya "jangan pernah share rules, selalu inline" sudah tidak berlaku. Rules boleh dideklarasikan sebagai package-level var dan dipakai lintas handler, bahkan untuk request konkuren.
+
 ```go
-// ❌ WRONG - Don't create shared validation functions
-func GetProductValidationRules() *map_validator.Roles {
-    return map_validator.BuildRoles()...
+// ✅ OK — rules di-share antar handler (konkuren-safe)
+var ProductRules = map_validator.BuildRoles().
+    SetRule("name", map_validator.Str().Between(1, 100)).
+    SetRule("price", map_validator.Int().WithMin(0)).
+    Done()
+
+func (h *restHandler) CreateProduct(c *gin.Context) {
+    req, err := map_validator.ValidateJSON[CreateProduct](c.Request, ProductRules)
+    if err != nil { ... }
 }
 
-// ✅ CORRECT - Define validation inline in controller
-func (h *restHandler) CreateProduct(c *gin.Context) {
-    roles := map_validator.BuildRoles()... // Define here
+func (h *restHandler) UpdateProduct(c *gin.Context) {
+    req, err := map_validator.ValidateJSON[UpdateProduct](c.Request, ProductRules)
+    if err != nil { ... }
 }
 ```
+
+Inline tetap valid untuk rules yang memang hanya dipakai satu handler — pilih berdasarkan reuse, bukan karena keterbatasan library.
 
 ### 5. **DATA FLOW PRINCIPLE**
 ```
@@ -296,20 +324,55 @@ HTTP Request → Controller (with map_validator) → Clean Data → Service Laye
 
 ## Table of Contents
 1. [Installation](#installation)
-2. [Basic Validation Pattern](#basic-validation-pattern)
-3. [LoadJsonHttp Method](#loadjsonhttp-method)
-4. [Validation Result Processing](#validation-result-processing)
-5. [The Bind Method](#the-bind-method)
-6. [Direct Data Access (Get Method)](#direct-data-access-get-method)
-7. [Advanced Validation Features](#advanced-validation-features)
-8. [Field Types and Rules](#field-types-and-rules)
-9. [Manipulators](#manipulators)
-10. [Custom Messages](#custom-messages)
-11. [Complex Validations](#complex-validations)
-12. [Settings](#settings)
-13. [Error Handling](#error-handling)
+2. [Preferred Style (read this first)](#preferred-style-read-this-first)
+3. [Basic Validation Pattern (legacy 5-step)](#basic-validation-pattern-legacy-5-step--gunakan-kalau-perlu-kontrol-per-step)
+4. [LoadJsonHttp Method](#loadjsonhttp-method)
+5. [Validation Result Processing](#validation-result-processing)
+6. [The Bind Method](#the-bind-method)
+7. [Direct Data Access (Get Method)](#direct-data-access-get-method)
+8. [Advanced Validation Features](#advanced-validation-features)
+9. [Field Types and Rules](#field-types-and-rules)
+10. [Manipulators](#manipulators)
+11. [Custom Messages](#custom-messages)
+12. [Complex Validations](#complex-validations)
+13. [Settings](#settings)
+14. [Error Handling](#error-handling)
 
-## Basic Validation Pattern
+## Preferred Style (read this first)
+
+Pakai **`ValidateJSON[T]` + short constructors**. Itu bentuk paling ringkas dan aman. Bentuk lama (struct literal `Rules{...}` + pipeline 5-langkah) tetap valid, tapi digunakan hanya kalau butuh kontrol di antara langkah (extension hook, `GetFilledField()`, manipulasi pre-bind).
+
+```go
+// ✅ Preferred — one-liner ValidateJSON dengan short constructors
+type CreateUser struct {
+    Email    string `json:"email"`
+    Password string `json:"password"`
+    Role     string `json:"role"`
+}
+
+rules := map_validator.BuildRoles().
+    SetRule("email", map_validator.Email().WithMax(255)).
+    SetRule("password", map_validator.Str().Between(8, 64)).
+    SetRule("role", map_validator.StrEnum("admin", "staff", "guest").Nullable().Default("guest")).
+    Done()
+
+req, err := map_validator.ValidateJSON[CreateUser](c.Request, rules)
+if err != nil {
+    c.JSON(http.StatusBadRequest, gin_utils.MessageResponse{Message: err.Error()})
+    return
+}
+// req sudah ter-validasi dan ter-bind
+```
+
+**Short constructors yang tersedia:**
+- Type: `Str()`, `Int()`, `Int64()`, `Float64()`, `Bool()`, `Email()`, `UUID()`, `IPv4()`
+- Enum: `StrEnum(items...)`, `IntEnum(items...)`
+- Nesting: `NestedObject(rules)`, `ListOfObject(rules)`
+- Chain: `.Nullable()`, `.Default(v)`, `.WithMin(n)`, `.WithMax(n)`, `.Between(min, max)`, `.Regex(pattern)`, `.WithMsg(cm)`, `.UniqueFrom(fields...)`, `.WithRequiredIf(fields...)`, `.WithRequiredWithout(fields...)`
+
+Semua chain method pakai value receiver — tidak mutasi Rules asli, aman dichain.
+
+## Basic Validation Pattern (legacy 5-step — gunakan kalau perlu kontrol per-step)
 
 Pattern standar yang digunakan di seluruh project:
 
@@ -340,6 +403,13 @@ if err != nil {
 var requestStruct RequestStruct
 jsonData.Bind(&requestStruct)
 ```
+
+**Kapan pakai pipeline 5-langkah (bukan `ValidateJSON`):**
+- Butuh cek `GetFilledField()` / `GetNullField()` sebelum bind
+- Pakai extension lifecycle dengan hook `BeforeValidation`/`AfterValidation` yang butuh akses ke hasil antara
+- Custom logic di antara `RunValidate` dan `Bind`
+
+Untuk semua kasus lain: pakai `ValidateJSON[T]` (lihat section "Preferred Style" di atas).
 
 ## LoadJsonHttp Method
 
@@ -1250,6 +1320,49 @@ if err != nil {
 
 ## Complete Real-World Examples
 
+### Example 0: Preferred modern style (ValidateJSON + short constructors)
+
+```go
+type CreateRegistryRequest struct {
+    Name        string `json:"name"`
+    Description string `json:"description"`
+    Purpose     string `json:"purpose"`
+    Public      bool   `json:"public"`
+    AgreeSA     bool   `json:"agreeSA"`
+    AgreeSoW    bool   `json:"agreeSoW"`
+    IPAddress   string `json:"ip_address"`
+}
+
+// Rules bisa package-level (reusable) atau inline — pilih per kebutuhan.
+var createRegistryRules = map_validator.BuildRoles().
+    SetRule("name", map_validator.Str().WithMax(255).Regex(constant.RegexExcludeSpecialCharSpace).
+        WithMsg(map_validator.CustomMsg{
+            OnRegexString: map_validator.SetMessage("the name field should not contains special character and space"),
+        })).
+    SetRule("description", map_validator.Str().WithMax(1000).Nullable()).
+    SetRule("purpose", map_validator.Str().WithMax(255)).
+    SetRule("public", map_validator.Bool()).
+    SetRule("agreeSA", map_validator.Bool()).
+    SetRule("agreeSoW", map_validator.Bool()).
+    SetRule("ip_address", map_validator.IPv4().WithMax(15)).
+    SetManipulator("name", map_validator_utils.TrimValidation).
+    SetManipulator("description", map_validator_utils.TrimValidation).
+    SetManipulator("purpose", map_validator_utils.TrimValidation).
+    SetManipulator("ip_address", map_validator_utils.TrimValidation).
+    Done()
+
+func (h *restHandler) CreateRegistry(c *gin.Context) {
+    req, err := map_validator.ValidateJSON[CreateRegistryRequest](c.Request, createRegistryRules)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin_utils.MessageResponse{Message: err.Error()})
+        return
+    }
+    // ... business logic pakai req
+}
+```
+
+Bandingkan dengan Example 1 di bawah yang memakai pipeline 5-langkah dan struct literal `Rules{...}`. Keduanya valid; gaya di atas lebih ringkas untuk kasus "validate-and-bind biasa".
+
 ### Example 1: Create Registry Request
 ```go
 // Build validation rules
@@ -1674,7 +1787,7 @@ if exists {
 ### Architectural Rules
 1. **Scope**: Only in controller layer for HTTP requests
 2. **Purpose**: Input sanitization and format checking
-3. **No sharing**: Define validation inline, no shared functions
+3. **Sharing rules**: Safe to share as package-level vars across handlers and goroutines (pasca fix state mutable). Inline tetap valid — pilih berdasarkan reuse.
 4. **No business logic**: Keep it simple and fast
 5. **Architecture**: Clear separation between validation and business logic
 

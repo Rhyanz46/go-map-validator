@@ -20,25 +20,31 @@ Import: `import "github.com/Rhyanz46/go-map-validator/map_validator"`
 ## Quick Start
 
 ```go
-// Validate a map and bind to struct
-payload := map[string]interface{}{"email": "dev@example.com", "password": "secret123"}
-
-rules := map_validator.BuildRoles().
-    SetRule("email", map_validator.Rules{Type: reflect.String, Email: true, Max: map_validator.SetTotal(100)}).
-    SetRule("password", map_validator.Rules{Type: reflect.String, Min: map_validator.SetTotal(6), Max: map_validator.SetTotal(30)}).
-    Done()
-
-op, err := map_validator.NewValidateBuilder().SetRules(rules).Load(payload)
-if err != nil { panic(err) }
-extra, err := op.RunValidate()
-if err != nil { panic(err) }
+import "github.com/Rhyanz46/go-map-validator/map_validator"
 
 type Login struct {
     Email    string `json:"email"`
     Password string `json:"password"`
 }
-var dto Login
-if err := extra.Bind(&dto); err != nil { panic(err) }
+
+// Build rules once — safe to reuse across handlers and goroutines.
+rules := map_validator.BuildRoles().
+    SetRule("email", map_validator.Email().WithMax(100)).
+    SetRule("password", map_validator.Str().Between(6, 30)).
+    Done()
+
+// HTTP handler: one-liner validate-and-bind
+dto, err := map_validator.ValidateJSON[Login](httpReq, rules)
+if err != nil { /* handle — ErrNoRules, ErrInvalidJsonFormat, or validation error */ }
+
+// Or validate a plain map (no HTTP):
+payload := map[string]interface{}{"email": "dev@example.com", "password": "secret123"}
+extra, err := map_validator.NewValidateBuilder().SetRules(rules).Load(payload)
+if err != nil { /* handle */ }
+result, err := extra.RunValidate()
+if err != nil { /* handle */ }
+var dto2 Login
+_ = result.Bind(&dto2)
 ```
 
 ## Features
@@ -52,9 +58,32 @@ if err := extra.Bind(&dto); err != nil { panic(err) }
 - Uniqueness across sibling fields (`Unique`).
 - Conditional required: `RequiredWithout` and `RequiredIf`.
 - Strict mode to reject unknown keys (`Setting{Strict:true}`).
-- Custom messages for type/regex/min/max/unique.
+- Custom messages for type/regex/min/max/unique/enum value.
 - Manipulators to post-process values.
 - Extensions lifecycle hooks.
+- **Short constructors** (`Str()`, `Int()`, `Email()`, `UUID()`, `IPv4()`, `StrEnum()`, …) and chain helpers (`.WithMax()`, `.Nullable()`, `.Between()`, `.Regex()`, …) for concise rule definitions.
+- **`ValidateJSON[T]`** — generic one-liner that collapses the Load → Validate → Bind pipeline for HTTP handlers.
+- **Safe for shared & concurrent use** — rules no longer hold per-call state, so a single `rules` value can be declared as a package-level var and reused across handlers and goroutines.
+
+## What's new in v0.0.41
+
+All changes are additive on the public API — existing usage patterns keep working.
+
+**New APIs**
+- `ValidateJSON[T any](r *http.Request, rules RulesWrapper) (T, error)` — collapses Load → Validate → Bind into a single call. See [One-liner for JSON handlers](#one-liner-for-json-handlers).
+- Short constructors: `Str()`, `Int()`, `Int64()`, `Float64()`, `Bool()`, `Email()`, `UUID()`, `IPv4()`, `StrEnum(items…)`, `IntEnum(items…)`, `NestedObject(w)`, `ListOfObject(w)`.
+- Chain helpers on `Rules`: `.Nullable()`, `.Default(v)`, `.WithMin(n)`, `.WithMax(n)`, `.Between(min, max)`, `.Regex(p)`, `.WithMsg(cm)`, `.UniqueFrom(…)`, `.WithRequiredIf(…)`, `.WithRequiredWithout(…)`. Value-receiver, so each call returns a copy — safe to chain.
+- `Done()` on `RulesWrapper` — optional chain terminator so `BuildRoles().SetRule(…).Done()` reads cleanly.
+- `OnEnumValueNotMatch` field in `CustomMsg` for custom enum-mismatch messages, plus two new template variables: `${actual_value}` and `${enum_values}`.
+- New error sentinel `ErrNoRules` returned by `Load` / `LoadJsonHttp` / `LoadFormHttp` when no rules are set.
+
+**Behavior changes**
+- `SetRules(empty)` no longer panics. The error surfaces as `ErrNoRules` from the subsequent `Load*` call — easier to handle uniformly.
+- Enum with an unsupported element kind no longer panics. It returns a normal validation error instead.
+- Rules are now safe to share across handlers and goroutines. The previous mutable-state bug inside `rulesWrapper` is gone — you can declare `rules` as a package-level variable and reuse it freely.
+
+**Bug fixes**
+- `ListObject` items now bind into the target struct with their actual field values. Before, items often bound as zero values because of a key-shadowing bug inside `validateRecursive`.
 
 ## HTTP Integration (JSON)
 
@@ -69,6 +98,49 @@ _ = extra.Bind(&dto)
 ```
 
 Note: JSON numbers decode as `float64`. The validator tolerates integer-family comparisons when rules expect an int kind.
+
+## One-liner for JSON handlers
+
+`ValidateJSON[T]` collapses the Load → Validate → Bind pipeline into a single generic call. Ideal for HTTP handlers where you rarely need the intermediate state.
+
+```go
+type LoginRequest struct {
+    Email    string `json:"email"`
+    Password string `json:"password"`
+}
+
+rules := map_validator.BuildRoles().
+    SetRule("email", map_validator.Email().WithMax(255)).
+    SetRule("password", map_validator.Str().Between(6, 64)).
+    Done()
+
+req, err := map_validator.ValidateJSON[LoginRequest](httpReq, rules)
+if err != nil {
+    // forward as-is: ErrNoRules, ErrInvalidJsonFormat, or validation error
+    return err
+}
+// req is already validated and bound
+```
+
+Before vs after — same validation, less ceremony:
+
+```go
+// before: 4 error checks, intermediate vars
+op, err := map_validator.NewValidateBuilder().SetRules(rules).LoadJsonHttp(r)
+if err != nil { return err }
+extra, err := op.RunValidate()
+if err != nil { return err }
+var dto LoginRequest
+if err := extra.Bind(&dto); err != nil { return err }
+
+// after: one call, one error check
+dto, err := map_validator.ValidateJSON[LoginRequest](r, rules)
+if err != nil { return err }
+```
+
+The 5-step pipeline remains the right choice when you need access to the `ExtraOperationData` returned by `RunValidate()` before bind — e.g. reading `GetFilledField()` / `GetNullField()` / `GetData()`, or running custom logic against the validated map before committing it to your struct. Extension lifecycle hooks (`BeforeLoad`, `AfterLoad`, `BeforeValidation`, `AfterValidation`) still run under `ValidateJSON` because it internally composes the same `LoadJsonHttp` + `RunValidate` calls.
+
+Since rules no longer hold per-call mutable state, the same `rules` value can be declared as a package-level variable and shared across handlers safely — including concurrent requests.
 
 ## Nested Objects
 
@@ -132,7 +204,7 @@ rules := map_validator.BuildRoles().
 ## Custom Messages
 
 Supported fields in `CustomMsg`:
-- `OnTypeNotMatch`, `OnRegexString`, `OnMin`, `OnMax`, `OnUnique`.
+- `OnTypeNotMatch`, `OnRegexString`, `OnMin`, `OnMax`, `OnUnique`, `OnEnumValueNotMatch`.
 
 Message variables:
 
@@ -144,6 +216,8 @@ Message variables:
 - `${expected_max_length}`: nilai/ukuran maksimum yang diharapkan (`Max`).
 - `${unique_origin}`: nama field asal pada pengecekan unik.
 - `${unique_target}`: nama field target yang dibandingkan pada pengecekan unik.
+- `${actual_value}`: nilai aktual yang dikirim (tersedia di `OnEnumValueNotMatch`).
+- `${enum_values}`: daftar nilai enum yang diperbolehkan (tersedia di `OnEnumValueNotMatch`).
 
 ```go
 rules := map_validator.BuildRoles().
@@ -194,10 +268,21 @@ rules := map_validator.BuildRoles().
   Done()
 ```
 
+- Enum value not in list
+```go
+rules := map_validator.BuildRoles().
+  SetRule("status", map_validator.StrEnum("active", "inactive", "pending").
+    WithMsg(map_validator.CustomMsg{
+      OnEnumValueNotMatch: map_validator.SetMessage("'${field}' value '${actual_value}' is not allowed; expected one of ${enum_values}"),
+    })).
+  Done()
+// → "'status' value 'banned' is not allowed; expected one of [active inactive pending]"
+```
+
 Notes:
 - If a corresponding `CustomMsg` is not set, the default error message is used.
 - Variables are replaced contextually at error time (e.g., `${field}` is the rule’s key).
-- Currently not customizable: enum mismatch, null errors, and specific RequiredWithout/If messages.
+- Currently not customizable: null errors, and specific `RequiredWithout` / `RequiredIf` messages.
 
 ## Manipulators (Post-process)
 
@@ -232,7 +317,8 @@ Set `Setting{Strict:true}` in a rules group to reject any unknown keys at that o
 - `LoadFormHttp`: non-file values arrive as strings; there is no automatic string→int/float/bool parsing. Use a manipulator or extension to convert.
 - Email validation is simple (checks `@` and `.`), not full RFC compliance.
 - Error reporting returns the first encountered error (no multi-error aggregation with field paths yet).
-- Custom messages are not yet available for: enum mismatch, null errors, and RequiredWithout/If specific messages.
+- Custom messages are not yet available for: null errors and specific `RequiredWithout` / `RequiredIf` messages.
+- Empty rules no longer panic. `SetRules` accepts them silently; the subsequent `Load` / `LoadJsonHttp` / `LoadFormHttp` returns `ErrNoRules` so callers can handle it uniformly.
 
 ## Roadmap
 
