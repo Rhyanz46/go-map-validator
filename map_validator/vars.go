@@ -6,6 +6,7 @@ var (
 	ErrNoData            = errors.New("no validatorType")
 	ErrInvalidJsonFormat = errors.New("is not valid json")
 	ErrUnsupportType     = errors.New("type is not support")
+	ErrNoRules           = errors.New("you need to set roles")
 )
 
 type LoadFromType int

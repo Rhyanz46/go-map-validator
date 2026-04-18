@@ -73,6 +73,8 @@ func buildMessage(msg string, meta MessageMeta) error {
 	expectedMaxLengthVar := "${expected_max_length}"
 	uniqueOriginVar := "${unique_origin}"
 	uniqueTargetVar := "${unique_target}"
+	actualValueVar := "${actual_value}"
+	enumValuesVar := "${enum_values}"
 	if strings.Contains(msg, fieldVar) {
 		if meta.Field != nil {
 			v := *meta.Field
@@ -121,19 +123,44 @@ func buildMessage(msg string, meta MessageMeta) error {
 			msg = strings.ReplaceAll(msg, uniqueTargetVar, v)
 		}
 	}
+	if strings.Contains(msg, actualValueVar) {
+		if meta.ActualValue != nil {
+			msg = strings.ReplaceAll(msg, actualValueVar, *meta.ActualValue)
+		}
+	}
+	if strings.Contains(msg, enumValuesVar) {
+		if meta.EnumValues != nil {
+			msg = strings.ReplaceAll(msg, enumValuesVar, *meta.EnumValues)
+		}
+	}
 	return errors.New(msg)
 }
 
-func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, data map[string]interface{}, rule Rules, loadedFrom loadFromType) (interface{}, error) {
+// wrapperRunState holds the mutable per-scope state used during a single
+// RunValidate call. It lives outside RulesWrapper so that rules can be shared
+// across handlers, reused across runs, and even self-referenced (recursive
+// Object rules) without state bleeding between scopes.
+type wrapperRunState struct {
+	filledField     []string
+	nullFields      []string
+	requiredWithout map[string][]string
+	requiredIf      map[string][]string
+}
+
+func newWrapperRunState() *wrapperRunState {
+	return &wrapperRunState{}
+}
+
+func validateRecursive(pChain ChainerType, wrapper RulesWrapper, state *wrapperRunState, key string, data map[string]interface{}, rule Rules, loadedFrom loadFromType) (interface{}, error) {
 	//child and parent chain
 	var res interface{}
 	var err error
-	chainKey := key
+	nodeKey := key
 	// Only use indexed keys for ListObject, not for primitive List
 	if rule.isList() && rule.ListObject != nil {
-		chainKey = fmt.Sprintf("%s[%d]", pChain.GetKey(), len(pChain.GetChildren())-1)
+		nodeKey = fmt.Sprintf("%s[%d]", pChain.GetKey(), len(pChain.GetChildren())-1)
 	}
-	cChain := pChain.AddChild().SetKey(chainKey)
+	cChain := pChain.AddChild().SetKey(nodeKey)
 	var endOfLoop bool
 	if wrapper != nil && wrapper.getSetting().Strict {
 		var allowedKeys []string
@@ -157,7 +184,7 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 		cChain.SetValue(res)
 	}
 
-	if wrapper != nil {
+	if wrapper != nil && state != nil {
 		// add unique values
 		if res != nil && len(rule.Unique) > 0 {
 			cChain.SetUniques(rule.Unique)
@@ -168,21 +195,13 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 			cChain.SetCustomMsg(&rule.CustomMsg)
 		}
 
-		// put filled and null fields
-		if wrapper.getFilledField() == nil {
-			wrapper.setFilledField(&[]string{})
-		}
-		if wrapper.getNullFields() == nil {
-			wrapper.setNullFields(&[]string{})
-		}
-
 		if res != nil {
-			wrapper.appendFilledField(key)
+			state.filledField = append(state.filledField, key)
 		} else {
-			wrapper.appendNullFields(key)
+			state.nullFields = append(state.nullFields, key)
 		}
 
-		if len(wrapper.getRules()) == len(*wrapper.getNullFields())+len(*wrapper.getFilledField()) {
+		if len(wrapper.getRules()) == len(state.nullFields)+len(state.filledField) {
 			endOfLoop = true
 		}
 
@@ -194,28 +213,24 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 	}
 
 	// put required without values
-	if wrapper != nil && len(rule.RequiredWithout) > 0 {
+	if state != nil && len(rule.RequiredWithout) > 0 {
+		if state.requiredWithout == nil {
+			state.requiredWithout = map[string][]string{}
+		}
 		for _, unique := range rule.RequiredWithout {
-			if wrapper.getRequiredWithout() == nil {
-				wrapper.setRequiredWithout(&map[string][]string{})
-			}
-
-			if _, exists := (*wrapper.getRequiredWithout())[unique]; !exists {
-				(*wrapper.getRequiredWithout())[unique] = []string{}
-			}
-			(*wrapper.getRequiredWithout())[unique] = append((*wrapper.getRequiredWithout())[unique], key)
+			state.requiredWithout[unique] = append(state.requiredWithout[unique], key)
 		}
 	}
 
-	if endOfLoop && wrapper != nil && wrapper.getRequiredWithout() != nil {
-		for _, field := range *wrapper.getNullFields() {
+	if endOfLoop && state != nil && state.requiredWithout != nil {
+		for _, field := range state.nullFields {
 			var required bool
-			dependenciesField := (*wrapper.getRequiredWithout())[field]
+			dependenciesField := state.requiredWithout[field]
 			if len(dependenciesField) == 0 {
 				continue
 			}
 			for _, XField := range dependenciesField {
-				if isDataInList(XField, *wrapper.getFilledField()) {
+				if isDataInList(XField, state.filledField) {
 					required = true
 				}
 			}
@@ -226,28 +241,24 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 	}
 
 	// put required if values
-	if wrapper != nil && len(rule.RequiredIf) > 0 {
+	if state != nil && len(rule.RequiredIf) > 0 {
+		if state.requiredIf == nil {
+			state.requiredIf = map[string][]string{}
+		}
 		for _, unique := range rule.RequiredIf {
-			if wrapper.getRequiredIf() == nil {
-				wrapper.setRequiredIf(&map[string][]string{})
-			}
-
-			if _, exists := (*wrapper.getRequiredIf())[unique]; !exists {
-				(*wrapper.getRequiredIf())[unique] = []string{}
-			}
-			(*wrapper.getRequiredIf())[unique] = append((*wrapper.getRequiredIf())[unique], key)
+			state.requiredIf[unique] = append(state.requiredIf[unique], key)
 		}
 	}
 
-	if endOfLoop && wrapper != nil && wrapper.getRequiredIf() != nil {
-		for _, field := range *wrapper.getFilledField() {
+	if endOfLoop && state != nil && state.requiredIf != nil {
+		for _, field := range state.filledField {
 			var required bool
-			dependenciesField := (*wrapper.getRequiredIf())[field]
+			dependenciesField := state.requiredIf[field]
 			if len(dependenciesField) == 0 {
 				continue
 			}
 			for _, XField := range dependenciesField {
-				if !isDataInList(XField, *wrapper.getNullFields()) {
+				if !isDataInList(XField, state.nullFields) {
 					required = true
 				}
 			}
@@ -259,8 +270,9 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 
 	// if list
 	if rule.Object != nil && res != nil {
+		innerState := newWrapperRunState()
 		for keyX, ruleX := range rule.Object.getRules() {
-			_, err = validateRecursive(cChain, rule.Object, keyX, res.(map[string]interface{}), ruleX, fromJSONEncoder)
+			_, err = validateRecursive(cChain, rule.Object, innerState, keyX, res.(map[string]interface{}), ruleX, fromJSONEncoder)
 			if err != nil {
 				return nil, err
 			}
@@ -274,8 +286,9 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, key string, dat
 			if m, ok := xRes.(map[string]interface{}); ok {
 				// Validate as object with the provided child rules
 				tmpChain := newChainer().SetKey(chainKey)
+				itemState := newWrapperRunState()
 				for keyX, ruleX := range rule.ListObject.getRules() {
-					_, err = validateRecursive(tmpChain, rule.ListObject, keyX, m, ruleX, fromJSONEncoder)
+					_, err = validateRecursive(tmpChain, rule.ListObject, itemState, keyX, m, ruleX, fromJSONEncoder)
 					if err != nil {
 						return nil, err
 					}
@@ -600,10 +613,14 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 	buildEnumErrorMessage := func(enumValues interface{}, enumType reflect.Type, actualType reflect.Kind) error {
 		if validator.CustomMsg.OnEnumValueNotMatch != nil {
 			expectedType := enumType.Elem().Kind()
+			actualValue := fmt.Sprintf("%v", data)
+			enumValuesStr := fmt.Sprintf("%v", enumValues)
 			return buildMessage(*validator.CustomMsg.OnEnumValueNotMatch, MessageMeta{
 				Field:        &field,
 				ExpectedType: &expectedType,
 				ActualType:   &actualType,
+				ActualValue:  &actualValue,
+				EnumValues:   &enumValuesStr,
 			})
 		}
 		return buildErrorMessagef(field, "value is not in enum list%v", enumValues)
@@ -762,7 +779,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 					return nil, buildEnumErrorMessage(values, enumType, dataType)
 				}
 			default:
-				panic("not support type validatorType for enum value")
+				return nil, buildErrorMessagef(field, "enum is not supported for type '%s'", dataType.String())
 			}
 		}
 		return data, nil

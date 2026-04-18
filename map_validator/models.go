@@ -19,6 +19,8 @@ type MessageMeta struct {
 	ActualType        *reflect.Kind
 	UniqueOrigin      *string
 	UniqueTarget      *string
+	ActualValue       *string
+	EnumValues        *string
 }
 
 type EnumField[T any] struct {
@@ -91,16 +93,11 @@ type Setting struct {
 
 // rulesWrapper implements RulesWrapper
 type rulesWrapper struct {
-	Rules           map[string]Rules
-	ListRules       ListRules
-	isListRules     bool
-	Setting         Setting
-	uniqueValues    *map[string]map[string]interface{}
-	filledField     *[]string
-	nullFields      *[]string
-	requiredWithout *map[string][]string
-	requiredIf      *map[string][]string
-	manipulator     []manipulator
+	Rules       map[string]Rules
+	ListRules   ListRules
+	isListRules bool
+	Setting     Setting
+	manipulator []manipulator
 }
 
 type ListRules struct {
