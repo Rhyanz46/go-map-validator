@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to incremental patch versioning (`v0.0.x`).
 
+## [v0.0.43]
+
+All changes are additive on the public API — existing usage patterns keep
+working without modification. This release responds to feedback about silent
+data-loss when struct fields lack a corresponding rule, by adding two opt-in
+escape hatches.
+
+### Added
+
+- **`List(elem Rules) Rules`** — primitive list shortcut. Element constraints (`Min`, `Max`, `Regex`, `Enum`, `UUID`, `Email`, `IPv4`) inherit from the inner rule. Container size constraints chain after `List(...)` via `.WithMin` / `.WithMax` / `.Between`.
+  ```go
+  SetRule("tags",   List(Str().WithMax(64)))           // each tag ≤ 64 chars
+  SetRule("ids",    List(UUID()).WithMin(1))           // ≥ 1 valid UUID
+  SetRule("emails", List(Email()))                     // each item is valid email
+  SetRule("colors", List(StrEnum("red","blue","green")))
+  SetRule("scores", List(Int().Between(0,100)).WithMax(10))
+  ```
+
+- **`Any() Rules`** — passthrough escape hatch. The field must be present (use `.Nullable()` to make optional) but its value is not validated and is preserved verbatim through `Bind()`. For heterogeneous metadata, raw config, third-party payloads.
+  ```go
+  SetRule("metadata", Any())              // required, any value
+  SetRule("settings", Any().Nullable())   // optional, any value
+  ```
+
+- **`Rules.Any` field** — supports the `Any()` short-circuit in validate logic.
+
+### Improved
+
+- Element-level `CustomMsg` (e.g. `OnMin` / `OnMax`) inside primitive lists now propagates correctly. Previously `List(Str().WithMax(3).WithMsg(CustomMsg{OnMax: ...}))` fell through to the default error message; now the custom message fires with `${field}`, `${actual_length}`, `${expected_max_length}` template variables.
+
+### Documentation
+
+- New "Whitelist Binding & Escape Hatches" section in `README.md` explicitly documents that fields without rules are stripped at `Bind()`. This is intentional (mass-assignment protection) but was previously undocumented — a common AI-generated code footgun.
+- `AI_GUIDE.md` adds two new MUST rules (slot 8 and 9 in BEST PRACTICES CHECKLIST) covering `List` for slices and `Any` for heterogeneous fields. New "🛡 Whitelist Binding (Important)" subsection with diagnostic flow for "data hilang setelah ValidateJSON" reports.
+- `llms.txt` and `llms-full.txt` updated: `List` and `Any` added to constructor catalog. `llms-full.txt` adds dedicated "Whitelist Binding (CRITICAL — common AI mistake)" section.
+
+### Migration notes
+
+- No code changes required for existing callers. All additions are opt-in.
+- If you have struct fields like `Tags []string` that were silently dropped before, declare them now with `SetRule("tags", List(Str()))` (or `List(Str().WithMax(N))`).
+- If you have heterogeneous fields (e.g. `Metadata map[string]interface{}`) that were dropped, declare with `SetRule("metadata", Any())` or `Any().Nullable()`.
+
 ## [v0.0.41]
 
 All changes are additive on the public API — existing usage patterns keep

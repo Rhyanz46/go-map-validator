@@ -40,6 +40,50 @@ func IntEnum(items ...int) Rules {
 func NestedObject(w RulesWrapper) Rules { return Rules{Object: w} }
 func ListOfObject(w RulesWrapper) Rules { return Rules{ListObject: w} }
 
+// List wraps an element rule into a primitive list rule.
+//
+// Element-level constraints (Min, Max) on the inner rule become per-element
+// constraints. Container-level constraints (list count) come from chaining
+// .WithMin / .WithMax / .Between on the returned Rules.
+//
+// Example:
+//
+//	List(Str().WithMax(64))            // each element is a string ≤ 64 chars
+//	List(Str()).WithMin(1).WithMax(10) // list has 1..10 string elements
+//	List(UUID())                       // each element is a valid UUID string
+//	List(StrEnum("a", "b", "c"))       // each element ∈ {"a","b","c"}
+func List(elem Rules) Rules {
+	list := ListRules{}
+	if elem.Min != nil {
+		list.Min = elem.Min
+	}
+	if elem.Max != nil {
+		list.Max = elem.Max
+	}
+	// Reset element Min/Max so the outer Rules' Min/Max (set later via chain)
+	// are interpreted as container-size constraints, not element constraints.
+	elem.Min = nil
+	elem.Max = nil
+	elem.List = BuildListRoles().SetListRule(list)
+	return elem
+}
+
+// Any returns a passthrough rule. The field must be present in the payload
+// (use .Nullable() to make it optional), but its value is not validated and
+// is preserved verbatim through Bind.
+//
+// Use Any for heterogeneous fields that should survive whitelist binding
+// (metadata, raw JSON config, third-party payload). Without Any (or another
+// rule), undeclared fields are stripped from the bound struct.
+//
+// Example:
+//
+//	SetRule("metadata", Any())              // required, any value
+//	SetRule("settings", Any().Nullable())   // optional, any value
+func Any() Rules {
+	return Rules{Any: true}
+}
+
 // --- Chain helpers on Rules ---
 //
 // Methods use a value receiver so each call returns a modified copy; the

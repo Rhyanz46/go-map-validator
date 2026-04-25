@@ -110,6 +110,7 @@ type Rules struct {
 	Null               bool
 	NilIfNull          bool
 	AnonymousObject    bool
+	Any                bool
 	Email              bool
 	Enum               *EnumField[any]
 	Type               reflect.Kind

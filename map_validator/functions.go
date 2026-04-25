@@ -387,6 +387,13 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 		return nil, nil
 	}
 
+	// Any() short-circuit: skip all type/format/range checks. The field is
+	// already known to be present (null check above passed), so we return
+	// the value verbatim for downstream Bind.
+	if validator.Any {
+		return data, nil
+	}
+
 	//if validator.ListObject != nil {
 	//	res, err := toInterfaceSlice(data)
 	//	if err != nil {
@@ -494,12 +501,28 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 				// String length constraints
 				if effectiveKind == reflect.String && gotKind == reflect.String {
 					if elementMinPtr != nil {
-						if int64(utf8.RuneCountInString(it.(string))) < *elementMinPtr {
+						actualLen := int64(utf8.RuneCountInString(it.(string)))
+						if actualLen < *elementMinPtr {
+							if validator.CustomMsg.OnMin != nil {
+								return nil, buildMessage(*validator.CustomMsg.OnMin, MessageMeta{
+									Field:             &field,
+									ExpectedMinLength: elementMinPtr,
+									ActualLength:      &actualLen,
+								})
+							}
 							return nil, buildErrorMessagef(field, "should be or greater than %v", *elementMinPtr)
 						}
 					}
 					if elementMaxPtr != nil {
-						if int64(utf8.RuneCountInString(it.(string))) > *elementMaxPtr {
+						actualLen := int64(utf8.RuneCountInString(it.(string)))
+						if actualLen > *elementMaxPtr {
+							if validator.CustomMsg.OnMax != nil {
+								return nil, buildMessage(*validator.CustomMsg.OnMax, MessageMeta{
+									Field:             &field,
+									ExpectedMaxLength: elementMaxPtr,
+									ActualLength:      &actualLen,
+								})
+							}
 							return nil, buildErrorMessagef(field, "should be or lower than %v", *elementMaxPtr)
 						}
 					}
@@ -538,9 +561,25 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 						num = 0
 					}
 					if elementMinPtr != nil && num < float64(*elementMinPtr) {
+						if validator.CustomMsg.OnMin != nil {
+							actualLen := int64(num)
+							return nil, buildMessage(*validator.CustomMsg.OnMin, MessageMeta{
+								Field:             &field,
+								ExpectedMinLength: elementMinPtr,
+								ActualLength:      &actualLen,
+							})
+						}
 						return nil, buildErrorMessagef(field, "should be or greater than %v", *elementMinPtr)
 					}
 					if elementMaxPtr != nil && num > float64(*elementMaxPtr) {
+						if validator.CustomMsg.OnMax != nil {
+							actualLen := int64(num)
+							return nil, buildMessage(*validator.CustomMsg.OnMax, MessageMeta{
+								Field:             &field,
+								ExpectedMaxLength: elementMaxPtr,
+								ActualLength:      &actualLen,
+							})
+						}
 						return nil, buildErrorMessagef(field, "should be or lower than %v", *elementMaxPtr)
 					}
 				}
