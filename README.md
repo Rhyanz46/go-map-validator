@@ -63,7 +63,23 @@ _ = result.Bind(&dto2)
 - Extensions lifecycle hooks.
 - **Short constructors** (`Str()`, `Int()`, `Email()`, `UUID()`, `IPv4()`, `StrEnum()`, …) and chain helpers (`.WithMax()`, `.Nullable()`, `.Between()`, `.Regex()`, …) for concise rule definitions.
 - **`ValidateJSON[T]`** — generic one-liner that collapses the Load → Validate → Bind pipeline for HTTP handlers.
+- **`List(elem)` and `Any()`** — primitive list helper and passthrough escape hatch for fields that should survive whitelist binding.
 - **Safe for shared & concurrent use** — rules no longer hold per-call state, so a single `rules` value can be declared as a package-level var and reused across handlers and goroutines.
+
+## What's new in v0.0.43
+
+All changes are additive on the public API.
+
+**New APIs**
+- `List(elem Rules) Rules` — primitive list shortcut. Element constraints (Min, Max, Regex, Enum, UUID, Email, IPv4) inherit from the inner rule. Container size constraints chain after `List(...)` via `.WithMin`/`.WithMax`.
+- `Any() Rules` — passthrough escape hatch. The field must be present (use `.Nullable()` to make optional) but its value is not validated and is preserved verbatim through `Bind()`.
+- `Rules.Any` field — supports the `Any()` short-circuit in validate logic.
+
+**Improved**
+- Element-level `CustomMsg` (e.g. `OnMin`/`OnMax`) inside primitive lists now propagates correctly with `${actual_length}` / `${expected_max_length}` template variables.
+
+**Documentation**
+- New "Whitelist Binding & Escape Hatches" section explicitly documents that undeclared struct fields are stripped at Bind, and explains how to opt back in with `List` / `Any`.
 
 ## What's new in v0.0.41
 
@@ -189,6 +205,68 @@ if err != nil { panic(err) }
 ```
 
 When using `ListObject`, the input must be an array of objects. Sending a single object yields: `"field 'goods' is not valid list object"`.
+
+## Whitelist Binding & Escape Hatches
+
+`map_validator` performs **whitelist binding**: only fields declared via `SetRule()` survive into the bound struct. Fields present in the JSON body but not in the rules are silently filtered out before `Bind()`.
+
+```go
+type Req struct {
+    Title string   `json:"title"`
+    Tags  []string `json:"tags"`   // ← will be empty if not declared in rules
+}
+
+rules := map_validator.BuildRoles().
+    SetRule("title", map_validator.Str()).
+    Done() // tags NOT declared
+
+req, _ := map_validator.ValidateJSON[Req](r, rules)
+// req.Title == value from body
+// req.Tags  == nil  ← stripped silently
+```
+
+This is intentional — it prevents [mass-assignment](https://owasp.org/www-community/attacks/Mass_Assignment_Cheat_Sheet) attacks. A body like `{"name":"x","is_admin":true}` cannot inject `IsAdmin` into your struct unless you explicitly declared a rule for it.
+
+When you genuinely need the field to survive, declare it with the appropriate rule. Two new escape hatches in v0.0.43:
+
+### `List(elem)` — primitive list helper
+
+For `[]string`, `[]int`, `[]uuid.UUID`, etc. The element rule's `Min` / `Max` constrain each item; chain `.WithMin` / `.WithMax` after `List(...)` for list-count constraints.
+
+```go
+SetRule("tags",   map_validator.List(map_validator.Str().WithMax(64)))    // each tag ≤ 64 chars
+SetRule("ids",    map_validator.List(map_validator.UUID()).WithMin(1))    // ≥ 1 valid UUID
+SetRule("colors", map_validator.List(map_validator.StrEnum("red","blue"))) // each item ∈ enum
+SetRule("emails", map_validator.List(map_validator.Email()))               // valid emails
+SetRule("scores", map_validator.List(map_validator.Int().Between(0,100)).WithMax(10)) // up to 10 ints, 0..100 each
+```
+
+`List(...)` accepts `Str()`, `Int()`, `Int64()`, `Float64()`, `Bool()`, `Email()`, `UUID()`, `IPv4()`, `StrEnum(...)`, and `IntEnum(...)` as element rules. Element regex (`Str().Regex(p)`) and custom messages (`.WithMsg(CustomMsg{OnMax:...})`) also work — the message receives `${field}`, `${actual_length}`, `${expected_max_length}` for the failing element.
+
+### `Any()` — passthrough escape hatch
+
+For heterogeneous fields you don't want to validate but need to preserve verbatim through Bind (third-party metadata, raw config, dynamic JSON).
+
+```go
+SetRule("metadata", map_validator.Any())              // required, any value
+SetRule("settings", map_validator.Any().Nullable())   // optional, any value
+```
+
+`Any()` short-circuits all type/format/range checks. The value (map, array, primitive, or null when `Nullable()`) is preserved as-is for `Bind()`. Pair with `.Nullable()` if the field is optional; otherwise the field is required.
+
+### When to use which
+
+| Scenario | Use |
+|---|---|
+| Array of strings/ints/UUIDs/emails | `List(elem)` |
+| Heterogeneous metadata, third-party payload | `Any()` |
+| Field has known nested shape | `NestedObject(rules)` |
+| Array of objects with known shape | `ListOfObject(itemRules)` |
+| Field shouldn't bind (security) | leave undeclared — gets stripped |
+
+### Whitelist behavior is consistent across all nesting levels
+
+The strip applies at every nesting depth. A field at level 3 (e.g. `items[].metadata.leaked_field`) without a corresponding rule is dropped just like a top-level field. This keeps mass-assignment protection consistent across deep request shapes.
 
 ## Unique and Conditional Required
 

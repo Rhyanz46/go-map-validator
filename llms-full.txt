@@ -83,6 +83,8 @@ Each returns a `Rules` value. Chain with `.WithMax()`, `.Nullable()`, etc.
 | `IntEnum(items...)` | int enum | `Rules{Type: reflect.Int, Enum: &EnumField[any]{Items: []int{...}}}` |
 | `NestedObject(w RulesWrapper)` | nested object | `Rules{Object: w}` |
 | `ListOfObject(w RulesWrapper)` | array of objects | `Rules{ListObject: w}` |
+| `List(elem Rules)` | primitive list | wraps elem with `List` field; element constraints inherit from elem |
+| `Any()` | passthrough | `Rules{Any: true}` — bypasses all type/format checks |
 
 ## Chain Helpers (value receivers, safe to chain)
 
@@ -195,21 +197,24 @@ rules := map_validator.BuildRoles().
 
 Payload must be a JSON array of objects. Sending a single object yields `"field 'goods' is not valid list object"`.
 
-### Primitive List
-
-For arrays of primitives (strings, numbers):
+### Primitive List — preferred style: `List(elem)`
 
 ```go
-rules := map_validator.BuildRoles().
-    SetRule("tags", map_validator.Rules{
-        Type: reflect.String,
-        List: map_validator.BuildListRoles(),
-        Enum: &map_validator.EnumField[any]{Items: []string{"red", "green", "blue"}},
-        Max:  map_validator.SetTotal(5),
-    })
+SetRule("tags",   map_validator.List(map_validator.Str().WithMax(64)))           // each tag ≤ 64 chars
+SetRule("ids",    map_validator.List(map_validator.UUID()).WithMin(1))           // ≥ 1 valid UUID
+SetRule("colors", map_validator.List(map_validator.StrEnum("red","blue","green"))) // each item ∈ enum
+SetRule("emails", map_validator.List(map_validator.Email()))                     // valid emails
+SetRule("scores", map_validator.List(map_validator.Int().Between(0,100)).WithMax(10)) // up to 10 ints, 0..100 each
+SetRule("slugs",  map_validator.List(map_validator.Str().Regex("^[a-z]+$")))    // regex per element
 ```
 
-With element-level constraints:
+Rules:
+- Element constraints (`Min`, `Max`, `Regex`, `Enum`, `UUID`, `Email`, `IPv4`) belong to the inner rule.
+- Container size constraints chain after `List(...)` via `.WithMin` / `.WithMax` / `.Between`.
+- `CustomMsg` on the inner rule (e.g. `Str().WithMax(3).WithMsg(CustomMsg{OnMax: ...})`) propagates to element-level errors with `${actual_length}` / `${expected_max_length}`.
+- Bind to typed slices: `[]string`, `[]int`, `[]uuid.UUID`, `[]float64` all work — JSON unmarshal handles type conversion via TextUnmarshaler.
+
+Legacy verbose form (still supported):
 
 ```go
 map_validator.Rules{
@@ -221,6 +226,39 @@ map_validator.Rules{
     Max: map_validator.SetTotal(7), // list length ≤ 7
 }
 ```
+
+### `Any()` — passthrough escape hatch
+
+```go
+SetRule("metadata", map_validator.Any())              // required, any value
+SetRule("settings", map_validator.Any().Nullable())   // optional, any value
+```
+
+`Any()` short-circuits all type/format/range checks. The value (map, array, primitive, or null when `Nullable()`) is preserved verbatim through `Bind()`. Use for heterogeneous fields that should survive whitelist binding without validation (third-party metadata, raw JSON, dynamic config).
+
+---
+
+## Whitelist Binding (CRITICAL — common AI mistake)
+
+`map_validator` performs whitelist binding: only fields with a `SetRule()` survive into the bound struct. Fields present in JSON but absent from rules are silently filtered out.
+
+```go
+type Req struct {
+    Title string   `json:"title"`
+    Tags  []string `json:"tags"`
+}
+
+rules := BuildRoles().SetRule("title", Str()).Done() // tags NOT declared
+
+req, _ := ValidateJSON[Req](r, rules)
+// req.Tags == nil  ← stripped silently
+```
+
+**This is intentional security** — prevents mass-assignment. A body `{"name":"x","is_admin":true}` cannot inject `IsAdmin` unless the rule explicitly declares it.
+
+**For AI agents**: always check that every field in the target struct (with its JSON tag) has a corresponding `SetRule(...)`. If the field is a slice → `List(elem)`. If heterogeneous → `Any()` or `Any().Nullable()`. If unsure whether the user wants the field bound at all → ASK.
+
+This applies at **every nesting depth**, not only top-level. A field at level 3 (`items[].metadata.X`) without its rule is also stripped.
 
 ---
 
@@ -522,6 +560,14 @@ rules := map_validator.BuildRoles().
 - Enum with unsupported element kind no longer panics — returns validation error.
 - Fixed `ListObject` bind: items now populate with real values (key-shadow bug in `validateRecursive`).
 
+### v0.0.43
+
+- Added `List(elem Rules) Rules` shortcut for primitive lists (`[]string`, `[]int`, `[]uuid.UUID`, etc.). Element constraints (Min/Max/Regex/Enum/UUID/Email/IPv4) inherit from inner rule; container size via chain `.WithMin`/`.WithMax`.
+- Added `Any() Rules` passthrough escape hatch for heterogeneous fields that should survive whitelist binding without validation. Pair with `.Nullable()` for optional.
+- Added `Rules.Any` field — supports the short-circuit in validate logic.
+- Element-level `CustomMsg` (e.g. `OnMin`/`OnMax`) inside primitive lists now propagates correctly with template variables.
+- New "Whitelist Binding" section in docs explicitly documenting that undeclared struct fields are stripped at Bind, with `List`/`Any` as opt-in escape hatches.
+
 All changes are additive on the public API. Existing usage patterns keep working.
 
 ---
@@ -552,6 +598,7 @@ If the user asks for one of these features, explain it's not yet supported and s
 │ Constructors:  Str Int Int64 Float64 Bool Email UUID IPv4       │
 │ Enum:          StrEnum(…) IntEnum(…)                            │
 │ Nesting:       NestedObject(w) ListOfObject(w)                  │
+│ List/Any:      List(elem) Any() Any().Nullable()                │
 │                                                                  │
 │ Chain:  .Nullable() .Default(v) .WithMin(n) .WithMax(n)         │
 │         .Between(min,max) .Regex(p) .WithMsg(cm)                │

@@ -103,20 +103,22 @@ Dalam kasus itu AI boleh lanjut **tapi wajib**:
 
 6. **MUST pakai `ValidateJSON[T]`** untuk pattern biasa (validate + bind JSON body). Jangan tulis pipeline 5-langkah kecuali butuh akses `GetFilledField()` / custom logic pre-bind.
 7. **MUST pakai short constructors** (`Email()`, `UUID()`, `Str().WithMax(n)`, dst). Struct literal `Rules{...}` hanya kalau field yang dibutuhkan belum ada short helper-nya.
-8. **SHOULD extract rules ke package-level var** kalau dipakai 2+ handler. Inline acceptable kalau hanya 1 handler.
-9. **SHOULD naming convention**: `<Action><Resource>Rules` — `CreateUserRules`, `UpdateRegistryRules`, `ListMembersRules`.
-10. **SHOULD file organization**: rules di `rules/<resource>.go` terpisah dari handler. Handler import rules, bukan deklarasi inline.
+8. **MUST pakai `List(elem)` untuk slice primitive** — `[]string`, `[]int`, `[]uuid.UUID`, dll. Jangan biarkan struct field slice tanpa rule (akan di-strip silently di Bind). Contoh: `SetRule("tags", List(Str().WithMax(64)))`.
+9. **MUST pakai `Any()` untuk field heterogen** yang tidak ingin divalidasi tapi harus survive Bind (metadata, raw config, third-party payload). Pair dengan `.Nullable()` kalau optional. Tanpa rule = silent drop.
+10. **SHOULD extract rules ke package-level var** kalau dipakai 2+ handler. Inline acceptable kalau hanya 1 handler.
+11. **SHOULD naming convention**: `<Action><Resource>Rules` — `CreateUserRules`, `UpdateRegistryRules`, `ListMembersRules`.
+12. **SHOULD file organization**: rules di `rules/<resource>.go` terpisah dari handler. Handler import rules, bukan deklarasi inline.
 
 ### 🧠 Validation vs business logic
 
-11. **MUST NOT: business rule di map_validator.** Kalau validasi butuh query DB / call API / cek state → itu service layer, bukan validator.
-12. **SHOULD batasi nesting max 3 level.** Lebih dalam → restructure DTO, split endpoint, atau pakai reference ID.
-13. **MUST NOT: side effect di manipulator.** Manipulator = pure function (input → output). Tidak boleh write DB, log, panggil API.
-14. **MUST NOT: invent field validation** yang user tidak minta. AI sering "baik-hati" nambah validasi `created_at`, `id` auto-generated, timestamps internal — tolak. Tanya user kalau ragu.
+13. **MUST NOT: business rule di map_validator.** Kalau validasi butuh query DB / call API / cek state → itu service layer, bukan validator.
+14. **SHOULD batasi nesting max 3 level.** Lebih dalam → restructure DTO, split endpoint, atau pakai reference ID.
+15. **MUST NOT: side effect di manipulator.** Manipulator = pure function (input → output). Tidak boleh write DB, log, panggil API.
+16. **MUST NOT: invent field validation** yang user tidak minta. AI sering "baik-hati" nambah validasi `created_at`, `id` auto-generated, timestamps internal — tolak. Tanya user kalau ragu.
 
 ### 🎯 Handler flow template
 
-15. **MUST urutan handler konsisten:**
+17. **MUST urutan handler konsisten:**
     ```
     1. Auth check (cek session/token)
     2. Parse path params (UUID, dll)
@@ -127,20 +129,20 @@ Dalam kasus itu AI boleh lanjut **tapi wajib**:
     ```
     Urutan ini harus sama di setiap handler. Jangan bolak-balik.
 
-16. **MUST error response format konsisten.** Forward `err.Error()` apa adanya. Jangan wrap dengan prefix seperti `"Validation error: "`.
+18. **MUST error response format konsisten.** Forward `err.Error()` apa adanya. Jangan wrap dengan prefix seperti `"Validation error: "`.
 
-17. **MUST NOT expose internal error ke client.** Untuk status 500, log error lengkap + return generic message (mis. `"internal server error"`). Client tidak perlu tahu stack trace.
+19. **MUST NOT expose internal error ke client.** Untuk status 500, log error lengkap + return generic message (mis. `"internal server error"`). Client tidak perlu tahu stack trace.
 
 ### 🧪 Testing
 
-18. **SHOULD tiap rule punya minimal 2 test**: happy path (valid) + unhappy path (invalid). Kalau AI tambah rule baru, AI tambah test-nya juga.
-19. **SHOULD test edge case**: empty body, null field, oversized string, wrong type, field tidak ada dalam payload.
-20. **SHOULD test struct bind** — pastikan JSON tag di struct match rule key. Bug paling umum: typo di tag atau salah key.
+20. **SHOULD tiap rule punya minimal 2 test**: happy path (valid) + unhappy path (invalid). Kalau AI tambah rule baru, AI tambah test-nya juga.
+21. **SHOULD test edge case**: empty body, null field, oversized string, wrong type, field tidak ada dalam payload.
+22. **SHOULD test struct bind** — pastikan JSON tag di struct match rule key. Bug paling umum: typo di tag atau salah key.
 
 ### 📝 Documentation
 
-21. **SHOULD comment `// why`** untuk regex aneh, magic number, Max value yang tidak obvious. Jangan comment what (sudah keliatan dari kode); comment why.
-22. **SHOULD `CustomMsg` untuk user-facing API**, skip untuk internal endpoint. Over-message = maintenance burden + inkonsistensi.
+23. **SHOULD comment `// why`** untuk regex aneh, magic number, Max value yang tidak obvious. Jangan comment what (sudah keliatan dari kode); comment why.
+24. **SHOULD `CustomMsg` untuk user-facing API**, skip untuk internal endpoint. Over-message = maintenance burden + inkonsistensi.
 
 ### 🚫 Anti-patterns — tolak saat lihat
 
@@ -150,6 +152,31 @@ Dalam kasus itu AI boleh lanjut **tapi wajib**:
 - Validasi bool `agree_terms == true` (itu business check — service layer)
 - Manipulator yang panggil DB lookup (side effect, no-go)
 - Nested 5+ level deep (restructure)
+- Struct field `Tags []string` tanpa rule yang sesuai → di-strip silently saat Bind. Pakai `List(Str())` atau `Any()`.
+- Struct field `Metadata map[string]interface{}` tanpa rule → silent drop. Pakai `Any()` atau `Any().Nullable()`.
+
+## 🛡 Whitelist Binding (Important — sering bikin AI bingung)
+
+`map_validator` melakukan **whitelist binding**: hanya field yang punya `SetRule()` yang survive ke struct hasil `Bind()`. Field yang ada di body JSON tapi tidak ada di rules **di-strip diam-diam**.
+
+**Kenapa ini security feature**: cegah mass-assignment. Body `{"name":"x","is_admin":true}` tidak bisa inject `IsAdmin` ke struct kalau AI tidak deklarasi rule untuk field itu.
+
+**Jebakan untuk AI**: kalau struct user punya field `Tags []string` atau `Metadata map[string]interface{}`, dan AI cuma deklarasi `SetRule("title", ...)` tanpa rule untuk Tags/Metadata, **field-nya akan zero-value** setelah Bind. User tidak dapat error — request 200 OK tapi data hilang.
+
+### Diagnostic flow saat user lapor "data hilang setelah ValidateJSON"
+
+1. Cek struct yang di-bind: ada field apa saja yang ada di JSON tag?
+2. Cek rules: setiap field di struct **harus** punya rule entry (kecuali user sengaja drop).
+3. Untuk slice primitive (`[]string`, `[]int`, `[]uuid.UUID`): pakai `List(elem)`.
+4. Untuk field heterogen (map, raw JSON): pakai `Any()` (atau `Any().Nullable()`).
+5. Kalau user **memang** mau drop field itu: clarify intent, biarkan tanpa rule.
+
+### Kapan AI harus tanya user
+
+- Saat struct punya field yang tidak jelas tipenya (mis. `Config interface{}`)
+- Saat field map/dict tanpa schema jelas
+- Saat user kasih DTO tapi tidak sebut field-fieldnya satu-satu
+- AI **jangan asumsi** drop atau preserve. Tanya: "Field `X` di struct ini mau divalidasi atau preserve apa adanya?"
 
 ### ⚡ Efficiency Mode for AI Agents
 

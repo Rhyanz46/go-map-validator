@@ -22,7 +22,7 @@ Framework-agnostic. Works with `net/http`, gin, echo, fiber. Rules are reusable 
 ## Core API
 
 - [ValidateJSON one-liner](https://github.com/Rhyanz46/go-map-validator/blob/main/README.md#one-liner-for-json-handlers): `ValidateJSON[T](r *http.Request, rules RulesWrapper) (T, error)` — full Load → Validate → Bind pipeline in a single call
-- [Short constructors](https://github.com/Rhyanz46/go-map-validator/blob/main/map_validator/shortcuts.go): `Str`, `Int`, `Int64`, `Float64`, `Bool`, `Email`, `UUID`, `IPv4`, `StrEnum`, `IntEnum`, `NestedObject`, `ListOfObject`
+- [Short constructors](https://github.com/Rhyanz46/go-map-validator/blob/main/map_validator/shortcuts.go): `Str`, `Int`, `Int64`, `Float64`, `Bool`, `Email`, `UUID`, `IPv4`, `StrEnum`, `IntEnum`, `NestedObject`, `ListOfObject`, `List`, `Any`
 - [Chain helpers on Rules](https://github.com/Rhyanz46/go-map-validator/blob/main/map_validator/shortcuts.go): `.Nullable`, `.Default`, `.WithMin`, `.WithMax`, `.Between`, `.Regex`, `.WithMsg`, `.UniqueFrom`, `.WithRequiredIf`, `.WithRequiredWithout` (value-receiver, safe to chain)
 - [Builder](https://github.com/Rhyanz46/go-map-validator/blob/main/map_validator/roles_builder.go): `BuildRoles().SetRule(name, rule).SetSetting(...).Done()` — returns `RulesWrapper`, reusable across handlers and goroutines
 - [Advanced pipeline](https://github.com/Rhyanz46/go-map-validator/blob/main/map_validator/implements.go): `NewValidateBuilder().SetRules(rules).LoadJsonHttp(r) / Load(m) / LoadFormHttp(r)` then `.RunValidate()` then `.Bind(&dst)` — use when `ValidateJSON` is insufficient (e.g. need `GetFilledField`, `GetNullField`, custom logic pre-bind, extension hooks)
@@ -45,6 +45,7 @@ Framework-agnostic. Works with `net/http`, gin, echo, fiber. Rules are reusable 
 - **Placement**: use `map_validator` only at the HTTP input boundary (controller / view / handler / representation / transport layer). Never in service, repository, model, or utility code. If the boundary layer is unclear, ask the user.
 - **Preferred style**: `ValidateJSON[T]` + short constructors. Avoid `Rules{Type: reflect.String, Max: SetTotal(100)}` literals unless a field has no short helper.
 - **Always set `Max`** on string fields (DoS protection). Always use `UUID()` for external IDs. Always use `StrEnum()` / `IntEnum()` for fields with limited values.
+- **Whitelist binding**: undeclared struct fields are silently stripped at Bind. For slices use `List(elem)` (e.g. `List(Str())`, `List(UUID())`). For heterogeneous fields use `Any()` (or `Any().Nullable()`). Without these escape hatches, fields zero-value silently — common AI mistake.
 - **No business logic in rules.** No DB lookups, no API calls, no cross-system checks inside `map_validator`. Those belong in the service layer.
 - **Forward errors verbatim** — do not wrap `err.Error()` with prefixes.
 - **Empty rules**: `SetRules` does not panic. `Load*` returns `ErrNoRules`. Handle it as a normal error.
