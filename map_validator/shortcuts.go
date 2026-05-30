@@ -90,8 +90,12 @@ func Any() Rules {
 // original Rules value is never mutated. Use `With*` prefix wherever the
 // method name would collide with an existing struct field.
 
-func (r Rules) Nullable() Rules             { r.Null = true; return r }
-func (r Rules) Default(v interface{}) Rules { r.IfNull = v; return r }
+func (r Rules) Nullable() Rules { r.Null = true; return r }
+
+// Default sets the value substituted when the field is absent/null. Because a
+// default only makes sense for an optional field, this also marks the rule
+// nullable so a missing field yields the default instead of a "required" error.
+func (r Rules) Default(v interface{}) Rules { r.IfNull = v; r.Null = true; return r }
 func (r Rules) WithMin(n int64) Rules       { r.Min = SetTotal(n); return r }
 func (r Rules) WithMax(n int64) Rules       { r.Max = SetTotal(n); return r }
 func (r Rules) Between(min, max int64) Rules {

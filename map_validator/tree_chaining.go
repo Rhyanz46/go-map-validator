@@ -2,6 +2,7 @@ package map_validator
 
 import (
 	"fmt"
+	"reflect"
 )
 
 type chainState struct {
@@ -235,7 +236,7 @@ func (cs *chainState) RunUniqueChecker() {
 			for _, unique := range cs.uniques {
 				originKey := cs.GetKey()
 				targetKey := bro.GetKey()
-				if targetKey == unique && bro.GetValue() == cs.GetValue() {
+				if targetKey == unique && reflect.DeepEqual(bro.GetValue(), cs.GetValue()) {
 					msgError := fmt.Errorf("value of '%s' and '%s' fields must be different", originKey, targetKey)
 					if cs.CustomMsg != nil && cs.CustomMsg.uniqueNotNil() {
 						msgError = buildMessage(*cs.CustomMsg.OnUnique, MessageMeta{
