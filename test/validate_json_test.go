@@ -293,6 +293,25 @@ func TestValidateJSONDefaultValue(t *testing.T) {
 	}
 }
 
+// TestDefaultImpliesNullable: .Default(v) alone (no .Nullable()) must apply the
+// default on a missing field instead of erroring as required.
+func TestDefaultImpliesNullable(t *testing.T) {
+	rules := map_validator.BuildRoles().
+		SetRule("role", map_validator.Str().Default("guest"))
+
+	op, err := map_validator.NewValidateBuilder().SetRules(rules).Load(map[string]interface{}{})
+	if err != nil {
+		t.Fatalf("load error: %s", err)
+	}
+	extra, err := op.RunValidate()
+	if err != nil {
+		t.Fatalf("expected default to apply on missing field, got error: %s", err)
+	}
+	if got := extra.GetData()["role"]; got != "guest" {
+		t.Errorf("expected default 'guest', got %v", got)
+	}
+}
+
 // TestValidateJSONListObject: ListOfObject(itemRules), body array of object,
 // tiap item ter-validasi dan ter-bind ke struct.
 func TestValidateJSONListObject(t *testing.T) {

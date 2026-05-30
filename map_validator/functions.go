@@ -112,13 +112,13 @@ func buildMessage(msg string, meta MessageMeta) error {
 		}
 	}
 	if strings.Contains(msg, uniqueOriginVar) {
-		if meta.Field != nil {
+		if meta.UniqueOrigin != nil {
 			v := *meta.UniqueOrigin
 			msg = strings.ReplaceAll(msg, uniqueOriginVar, v)
 		}
 	}
 	if strings.Contains(msg, uniqueTargetVar) {
-		if meta.Field != nil {
+		if meta.UniqueTarget != nil {
 			v := *meta.UniqueTarget
 			msg = strings.ReplaceAll(msg, uniqueTargetVar, v)
 		}
