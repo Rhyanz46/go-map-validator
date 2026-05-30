@@ -421,7 +421,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 
 	// validatorType type validation
 	dataType := reflect.TypeOf(data).Kind()
-	handleIntOnHttpJson := (dataFrom == fromHttpJson || dataFrom == fromJSONEncoder) && isIntegerFamily(validator.Type) && isIntegerFamily(dataType)
+	handleIntOnHttpJson := coercesNumbers(dataFrom) && isIntegerFamily(validator.Type) && isIntegerFamily(dataType)
 	customData := !(!validator.UUID &&
 		!validator.IPV4 &&
 		!validator.UUIDToString &&
@@ -440,7 +440,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 	//}
 
 	if dataType != validator.Type && !customData && !handleIntOnHttpJson {
-		if (dataFrom == fromHttpJson || dataFrom == fromJSONEncoder) && isIntegerFamily(validator.Type) {
+		if coercesNumbers(dataFrom) && isIntegerFamily(validator.Type) {
 			validator.Type = reflect.Int
 		}
 		if validator.CustomMsg.OnTypeNotMatch != nil {
@@ -589,7 +589,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 			if it != nil && tmpRule.Type != reflect.Invalid {
 				gotKind := reflect.TypeOf(it).Kind()
 				expectedKind := tmpRule.Type
-				allowIntCoerce := (dataFrom == fromHttpJson || dataFrom == fromJSONEncoder) && isIntegerFamily(expectedKind) && isIntegerFamily(gotKind)
+				allowIntCoerce := coercesNumbers(dataFrom) && isIntegerFamily(expectedKind) && isIntegerFamily(gotKind)
 				if gotKind != expectedKind && !allowIntCoerce {
 					// Map kind to human-friendly noun (e.g., int/uint/float -> integer)
 					noun := expectedKind.String()
@@ -672,7 +672,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 			// Handle integer family coercion for HTTP JSON like regular type validation
 			if dataType != enumType.Elem().Kind() {
 				// Allow type mismatch for integer family from HTTP JSON
-				if (dataFrom == fromHttpJson || dataFrom == fromJSONEncoder) &&
+				if coercesNumbers(dataFrom) &&
 					isIntegerFamily(enumType.Elem().Kind()) && isIntegerFamily(dataType) {
 					// Type coercion will be handled in the switch cases below
 				} else {
@@ -690,7 +690,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 			}
 
 			// Handle cross-type enum validation for integer family from HTTP JSON
-			if (dataFrom == fromHttpJson || dataFrom == fromJSONEncoder) &&
+			if coercesNumbers(dataFrom) &&
 				isIntegerFamily(enumType.Elem().Kind()) && isIntegerFamily(dataType) &&
 				dataType != enumType.Elem().Kind() {
 				// Convert float64 JSON data to compare with integer family enum items
@@ -1237,6 +1237,32 @@ func isDataInList[T validatorType](key T, data []T) (result bool) {
 		}
 	}
 	return
+}
+
+// coercesNumbers reports whether values from this source arrive pre-decoded as
+// JSON-like primitives (numbers as float64, bools as bool) so integer-family
+// type coercion applies. Multipart/urlencoded form values are normalized the
+// same way in LoadFormHttp, so they qualify too.
+func coercesNumbers(dataFrom loadFromType) bool {
+	return dataFrom == fromHttpJson || dataFrom == fromJSONEncoder || dataFrom == fromHttpMultipartForm
+}
+
+// coerceFormValue normalizes a raw form string into the JSON-like primitive the
+// validator expects for the declared kind: numbers become float64 (matching the
+// JSON decoder), booleans become bool. On parse failure the raw string is
+// returned so the normal type check reports a clear "should be 'int'" error.
+func coerceFormValue(value string, kind reflect.Kind) interface{} {
+	switch {
+	case kind == reflect.Bool:
+		if b, err := strconv.ParseBool(value); err == nil {
+			return b
+		}
+	case isIntegerFamily(kind):
+		if f, err := strconv.ParseFloat(value, 64); err == nil {
+			return f
+		}
+	}
+	return value
 }
 
 func isIntegerFamily(dataType reflect.Kind) bool {

@@ -138,35 +138,24 @@ func (state *dataState) LoadFormHttp(r *http.Request) (*finalOperation, error) {
 		}
 	}
 	mapData := map[string]interface{}{}
-	allowType := []reflect.Kind{reflect.String, reflect.Int, reflect.Bool}
 	for key, rule := range state.rules.getRules() {
-		var isAllowType bool
 		if rule.File {
 			file, fileInfo, err := r.FormFile(key)
-			if err != nil {
-				mapData[key] = nil
-			}
-			if file == nil {
+			if err != nil || file == nil {
 				mapData[key] = nil
 			} else {
 				mapData[key] = FileRequest{File: file, FileInfo: fileInfo}
 			}
+			continue
+		}
+		if rule.Type != reflect.String && rule.Type != reflect.Bool && !isIntegerFamily(rule.Type) {
+			return nil, ErrUnsupportType
+		}
+		value := r.FormValue(key)
+		if value == "" {
+			mapData[key] = nil
 		} else {
-			for _, allowItem := range allowType {
-				if rule.Type == allowItem {
-					isAllowType = true
-					break
-				}
-			}
-			if !isAllowType {
-				return nil, ErrUnsupportType
-			}
-			value := r.FormValue(key)
-			if value == "" {
-				mapData[key] = nil
-			} else {
-				mapData[key] = value
-			}
+			mapData[key] = coerceFormValue(value, rule.Type)
 		}
 	}
 	//if state.strictAllowedValue {
