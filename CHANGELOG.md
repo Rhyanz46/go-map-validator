@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to incremental patch versioning (`v0.0.x`).
 
+## [v0.0.44]
+
+A bug-fix release. No public API changes.
+
+### Fixed
+
+- **Negative integers no longer bypass `Min` / `Max` (`WithMin` / `WithMax` / `Between`).** `extractInteger` previously matched digits with the regex `[0-9]+`, which silently dropped the leading sign and concatenated separate digit groups. As a result `-5` was treated as `5`: it passed `WithMin(1)` and was wrongly rejected by `WithMax(3)`. The helper now reads the numeric value directly via reflection (int / uint / float families), correctly preserving sign and magnitude — including large floats that render in scientific notation.
+
+### Internal
+
+- Removed the now-unused `removeAfter` string helper and the `fmt.Sprintf` + `e+` stripping at the integer `Min`/`Max` call sites.
+- Added regression tests: `TestNegativeIntegerFailsWithMin`, `TestNegativeIntegerPassesWithMax`, `TestNegativeIntegerBetween`.
+
+### Migration notes
+
+- No code changes required. Callers that (incorrectly) relied on negative integers passing a positive `Min` will now see those values correctly rejected.
+
 ## [v0.0.43]
 
 All changes are additive on the public API — existing usage patterns keep
