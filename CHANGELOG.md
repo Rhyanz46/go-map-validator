@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to incremental patch versioning (`v0.0.x`).
 
+## [v0.0.45]
+
+A bug-fix release. No public API additions; two behavior corrections are
+non-breaking (they fix paths that previously errored or panicked).
+
+### Fixed
+
+- **`.Default(v)` now works without an explicit `.Nullable()`.** Previously `Str().Default("guest")` still errored with `"we need 'x' field"` when the field was absent, so the default was never applied. `Default` now implies the field is optional. Non-breaking: present fields behave identically, and the previously-erroring case was unusable.
+- **Integer / float / bool fields from HTTP forms now validate.** `LoadFormHttp` stored every value as a string but type coercion only ran for JSON sources, so `Int`, `Float64`, and `Bool` form fields always failed with `"should be 'int'/'bool'"` — effectively only `String` worked. Form values are now normalized (numbers → `float64`, bools → `bool`) and run through the same coercion path as JSON. `Float32`/`Float64` and the full integer family are now accepted form types. Invalid input (e.g. `"abc"` for an `Int`) still yields a clear type error.
+- **Unique check no longer panics on non-comparable values.** Comparing sibling values with `==` panicked when a field held a slice/map (e.g. via `Any()`). The comparison now uses `reflect.DeepEqual`; equal slices are still flagged as violations.
+- **`${unique_origin}` / `${unique_target}` template guard corrected.** `buildMessage` checked `meta.Field` for nil but dereferenced `meta.UniqueOrigin` / `meta.UniqueTarget` — a latent nil-deref. Now guards the correct pointers.
+
+### Internal
+
+- New `coercesNumbers(dataFrom)` helper centralizes the JSON-like-source check and includes multipart/urlencoded forms.
+- New `coerceFormValue(value, kind)` helper for form value normalization.
+- Added `test/form_test.go` (first-ever `LoadFormHttp` coverage) and regression tests: `TestDefaultImpliesNullable`, `TestUniqueNonComparableValues`.
+
+### Migration notes
+
+- No code changes required for existing callers.
+- If you declared `Int`/`Bool`/`Float` rules for form handlers and worked around them by treating everything as `String`, you can now declare the real types.
+
 ## [v0.0.44]
 
 A bug-fix release. No public API changes.
