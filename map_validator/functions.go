@@ -936,8 +936,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 				actualLength = int64(total)
 			}
 		} else if isIntegerFamily(dataType) {
-			strData := removeAfter(fmt.Sprintf("%v", data), "e+")
-			num := extractInteger(strData)
+			num := extractInteger(data)
 			if num < *validator.Min {
 				isErr = true
 				actualLength = num
@@ -972,8 +971,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 				actualLength = int64(total)
 			}
 		} else if isIntegerFamily(dataType) {
-			strData := removeAfter(fmt.Sprintf("%v", data), "e+")
-			num := extractInteger(strData)
+			num := extractInteger(data)
 			if num > *validator.Max {
 				isErr = true
 				actualLength = num
@@ -1041,26 +1039,17 @@ func toMapStringInterface(data interface{}) (map[string]interface{}, error) {
 	return res, nil
 }
 
-func removeAfter(data, after string) string {
-	split := strings.Split(data, after)
-	if len(split) > 0 {
-		return split[0]
+func extractInteger(data interface{}) int64 {
+	v := reflect.ValueOf(data)
+	switch v.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return v.Int()
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return int64(v.Uint())
+	case reflect.Float32, reflect.Float64:
+		return int64(v.Float())
 	}
-	return data
-}
-
-func extractInteger(data string) int64 {
-	var intStr string
-	re := regexp.MustCompile("[0-9]+")
-	resStr := re.FindAllString(data, -1)
-	for _, val := range resStr {
-		intStr += val
-	}
-	res, err := strconv.ParseInt(intStr, 10, 64)
-	if err != nil {
-		return 0
-	}
-	return res
+	return 0
 }
 
 func convertValue(newValue interface{}, kind reflect.Kind, data reflect.Value, pointer bool) error {

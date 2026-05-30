@@ -530,6 +530,66 @@ func TestMixedIntegerFamilyEnumWithHttpRequest(t *testing.T) {
 	}
 }
 
+// Test negative integer must fail WithMin (regression: sign stripped by extractInteger)
+func TestNegativeIntegerFailsWithMin(t *testing.T) {
+	dataMap := map[string]interface{}{"qty": -5}
+
+	rules := map_validator.BuildRoles().
+		SetRule("qty", map_validator.Int().WithMin(1))
+
+	op, err := map_validator.NewValidateBuilder().SetRules(rules).Load(dataMap)
+	if err != nil {
+		t.Fatalf("load error: %s", err)
+	}
+
+	_, err = op.RunValidate()
+	if err == nil {
+		t.Fatal("Expected validation to fail for -5 with WithMin(1), but it passed")
+	}
+}
+
+// Test negative integer must pass WithMax (regression: sign stripped made -5 look like 5)
+func TestNegativeIntegerPassesWithMax(t *testing.T) {
+	dataMap := map[string]interface{}{"balance": -5}
+
+	rules := map_validator.BuildRoles().
+		SetRule("balance", map_validator.Int().WithMax(3))
+
+	op, err := map_validator.NewValidateBuilder().SetRules(rules).Load(dataMap)
+	if err != nil {
+		t.Fatalf("load error: %s", err)
+	}
+
+	_, err = op.RunValidate()
+	if err != nil {
+		t.Fatalf("Expected -5 to satisfy WithMax(3), but it failed: %s", err.Error())
+	}
+}
+
+// Test negative range via Between (e.g. temperature -10..10)
+func TestNegativeIntegerBetween(t *testing.T) {
+	rules := map_validator.BuildRoles().
+		SetRule("temp", map_validator.Int().Between(-10, 10))
+
+	// -3 is within range, must pass
+	op, err := map_validator.NewValidateBuilder().SetRules(rules).Load(map[string]interface{}{"temp": -3})
+	if err != nil {
+		t.Fatalf("load error: %s", err)
+	}
+	if _, err = op.RunValidate(); err != nil {
+		t.Fatalf("Expected -3 within [-10,10] to pass, got: %s", err.Error())
+	}
+
+	// -50 is below range, must fail
+	op2, err := map_validator.NewValidateBuilder().SetRules(rules).Load(map[string]interface{}{"temp": -50})
+	if err != nil {
+		t.Fatalf("load error: %s", err)
+	}
+	if _, err = op2.RunValidate(); err == nil {
+		t.Fatal("Expected -50 below [-10,10] to fail, but it passed")
+	}
+}
+
 // Helper function for string contains check (if not already defined elsewhere)
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || indexOfSubstring(s, substr) >= 0)
