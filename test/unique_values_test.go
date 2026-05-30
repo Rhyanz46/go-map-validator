@@ -138,6 +138,38 @@ func TestUniqueManyValue(t *testing.T) {
 	}
 }
 
+// TestUniqueNonComparableValues: unique check must not panic when field values
+// are non-comparable (slice/map); equal values should still be flagged.
+func TestUniqueNonComparableValues(t *testing.T) {
+	rules := map_validator.BuildRoles().
+		SetRule("a", map_validator.Any()).
+		SetRule("b", map_validator.Any().UniqueFrom("a"))
+
+	check, err := map_validator.NewValidateBuilder().SetRules(rules).Load(map[string]interface{}{
+		"a": []interface{}{1, 2, 3},
+		"b": []interface{}{1, 2, 3},
+	})
+	if err != nil {
+		t.Fatalf("load error: %s", err)
+	}
+	_, err = check.RunValidate()
+	if err == nil {
+		t.Fatal("expected unique violation for equal slices, got nil")
+	}
+
+	// Different slices must pass.
+	check2, err := map_validator.NewValidateBuilder().SetRules(rules).Load(map[string]interface{}{
+		"a": []interface{}{1, 2, 3},
+		"b": []interface{}{4, 5, 6},
+	})
+	if err != nil {
+		t.Fatalf("load error: %s", err)
+	}
+	if _, err = check2.RunValidate(); err != nil {
+		t.Fatalf("expected different slices to pass, got: %s", err)
+	}
+}
+
 func TestChildUniqueValueWithCustomMsg(t *testing.T) {
 	roleChild := map_validator.BuildRoles().
 		SetRule("name", map_validator.Rules{Type: reflect.String, Null: true}).
