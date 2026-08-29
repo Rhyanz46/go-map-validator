@@ -66,6 +66,21 @@ _ = result.Bind(&dto2)
 - **`List(elem)` and `Any()`** — primitive list helper and passthrough escape hatch for fields that should survive whitelist binding.
 - **Safe for shared & concurrent use** — rules no longer hold per-call state, so a single `rules` value can be declared as a package-level var and reused across handlers and goroutines.
 
+## What's new in v0.0.46
+
+A comprehensive bug-fix release addressing 10 silent defects and numeric edge cases with zero breaking API changes.
+
+**Bug Fixes & Robustness**
+- **Flag-based rules in HTTP forms**: `Email()`, `UUID()`, `IPv4()`, `StrEnum()`, and `.Regex()` now properly validate string form fields via `LoadFormHttp` instead of erroring with `ErrUnsupportType`.
+- **Compound rules rejected in forms**: Declaring compound rules (`Object`, `ListObject`, `List`, `AnonymousObject`) on HTTP form endpoints now fails early and safely with `ErrUnsupportType`.
+- **Float boundary precision**: Floating-point `WithMax` / `WithMin` comparisons no longer truncate to integer, preventing values like `3.9` from incorrectly bypassing `WithMax(3)`.
+- **`uint64` overflow safety**: Unsigned integers above `math.MaxInt64` are compared in `uint64` space instead of wrapping to negative values.
+- **`ListObject` item lifecycle**: Manipulators and sibling uniqueness (`UniqueFrom`) declared on `ListObject` child rules now execute per item.
+- **`ListRules.Unique` enforcement**: Primitive list uniqueness is now checked via `reflect.DeepEqual` and honors `CustomMsg.OnUnique`.
+- **Named type support**: Values with underlying string/int types (e.g. `type UserID string`) no longer trigger type-assertion panics.
+- **Universal integer enum coercion**: `IntEnum` comparisons coerce integer families from all sources (including plain maps) rather than only HTTP JSON/forms.
+- **Nullable bool classification**: Absent nullable `Bool` fields are now consistently categorized under `GetNullField()` instead of `GetFilledField()`.
+
 ## What's new in v0.0.43
 
 All changes are additive on the public API.
