@@ -46,6 +46,7 @@ Framework-agnostic. Works with `net/http`, gin, echo, fiber. Rules are reusable 
 - **Preferred style**: `ValidateJSON[T]` + short constructors. Avoid `Rules{Type: reflect.String, Max: SetTotal(100)}` literals unless a field has no short helper.
 - **Always set `Max`** on string fields (DoS protection). Always use `UUID()` for external IDs. Always use `StrEnum()` / `IntEnum()` for fields with limited values.
 - **Whitelist binding**: undeclared struct fields are silently stripped at Bind. For slices use `List(elem)` (e.g. `List(Str())`, `List(UUID())`). For heterogeneous fields use `Any()` (or `Any().Nullable()`). Without these escape hatches, fields zero-value silently — common AI mistake.
+- **HTTP form limits**: form endpoints (`LoadFormHttp`) accept primitive types (`Str`, `Int`, `Float`, `Bool`, `Email`, `UUID`, `IPv4`, `Regex`, enums) and file uploads. Compound structures (`Object`, `ListObject`, `List`, `AnonymousObject`) are not supported in flat HTTP forms and return `ErrUnsupportType`.
 - **No business logic in rules.** No DB lookups, no API calls, no cross-system checks inside `map_validator`. Those belong in the service layer.
 - **Forward errors verbatim** — do not wrap `err.Error()` with prefixes.
 - **Empty rules**: `SetRules` does not panic. `Load*` returns `ErrNoRules`. Handle it as a normal error.

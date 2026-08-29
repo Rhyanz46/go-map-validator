@@ -239,6 +239,16 @@ SetRule("settings", map_validator.Any().Nullable())   // optional, any value
 
 ---
 
+## HTTP Form Validation (`LoadFormHttp`)
+
+`LoadFormHttp` parses `application/x-www-form-urlencoded` and `multipart/form-data` requests:
+
+- Supported: primitive rules (`Str`, `Int`, `Int64`, `Float64`, `Bool`, `Email`, `UUID`, `IPv4`, `StrEnum`, `IntEnum`, `.Regex()`) and file upload fields (`FileRequest`).
+- Numeric and boolean strings are automatically normalized and coerced.
+- **Compound structures** (`Object`, `ListObject`, `List`, `AnonymousObject`) have no standard flat form representation and will fail early with `ErrUnsupportType`. Use JSON endpoints for nested payloads.
+
+---
+
 ## Whitelist Binding (CRITICAL — common AI mistake)
 
 `map_validator` performs whitelist binding: only fields with a `SetRule()` survive into the bound struct. Fields present in JSON but absent from rules are silently filtered out.
