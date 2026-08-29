@@ -148,7 +148,16 @@ func (state *dataState) LoadFormHttp(r *http.Request) (*finalOperation, error) {
 			}
 			continue
 		}
-		if rule.Type != reflect.String && rule.Type != reflect.Bool && !isIntegerFamily(rule.Type) {
+		// Compound structures (Object, ListObject, List) have no flat HTTP
+		// form representation — reject early with ErrUnsupportType.
+		if rule.Object != nil || rule.ListObject != nil || rule.List != nil || rule.AnonymousObject {
+			return nil, ErrUnsupportType
+		}
+		// Flag-based rules (Email, UUID, IPv4, Regex, Enum-only) carry a
+		// zero-value Type (reflect.Invalid) because they validate string
+		// content rather than a reflect kind — accept them as plain strings.
+		isFlagBasedRule := rule.Type == reflect.Invalid
+		if !isFlagBasedRule && rule.Type != reflect.String && rule.Type != reflect.Bool && !isIntegerFamily(rule.Type) {
 			return nil, ErrUnsupportType
 		}
 		value := r.FormValue(key)

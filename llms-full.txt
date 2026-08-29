@@ -147,6 +147,7 @@ Example: rule `Int()` accepts JSON `"port": 80` (float64 under the hood) as vali
 - Numbers: numeric comparison.
 - Slices (list types): element count.
 - For list element-level Min/Max (per-item), use `BuildListRoles().SetListRule(ListRules{Min, Max, ...})`.
+- `ListRules{Unique: true}` rejects duplicate elements in a primitive list (compared with `reflect.DeepEqual`; honors `CustomMsg.OnUnique`).
 
 ### Unique
 

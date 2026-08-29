@@ -270,9 +270,15 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, state *wrapperR
 
 	// if list
 	if rule.Object != nil && res != nil {
+		objRes, ok := res.(map[string]interface{})
+		if !ok {
+			// a rule carrying both Object and ListObject can land here with a
+			// slice — report a validation error instead of panicking
+			return nil, buildErrorMessage(key, "is not valid object")
+		}
 		innerState := newWrapperRunState()
 		for keyX, ruleX := range rule.Object.getRules() {
-			_, err = validateRecursive(cChain, rule.Object, innerState, keyX, res.(map[string]interface{}), ruleX, fromJSONEncoder)
+			_, err = validateRecursive(cChain, rule.Object, innerState, keyX, objRes, ruleX, fromJSONEncoder)
 			if err != nil {
 				return nil, err
 			}
@@ -280,7 +286,11 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, state *wrapperR
 	}
 
 	if rule.ListObject != nil && res != nil {
-		listRes := res.([]interface{})
+		listRes, ok := res.([]interface{})
+		if !ok {
+			// symmetric guard for a rule carrying both Object and ListObject
+			return nil, buildErrorMessage(key, "is not valid list object")
+		}
 		var manipulated []interface{}
 		for _, xRes := range listRes {
 			if m, ok := xRes.(map[string]interface{}); ok {
@@ -291,6 +301,18 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, state *wrapperR
 					_, err = validateRecursive(tmpChain, rule.ListObject, itemState, keyX, m, ruleX, fromJSONEncoder)
 					if err != nil {
 						return nil, err
+					}
+				}
+				// The item chain is detached from the root chain, so run its
+				// manipulators and unique checks locally — otherwise they are
+				// silently skipped by the root-level traversal in RunValidate.
+				if err = tmpChain.GetResult().RunManipulator(); err != nil {
+					return nil, err
+				}
+				tmpChain.GetResult().RunUniqueChecker()
+				for _, itemErr := range tmpChain.GetResult().GetErrors() {
+					if itemErr != nil {
+						return nil, itemErr
 					}
 				}
 				// collect validated/manipulated item data back into the slice
@@ -380,9 +402,6 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 	} else if validator.Null && data == nil {
 		if !validator.NilIfNull && validator.IfNull != nil {
 			return validator.IfNull, nil
-		}
-		if validator.Type == reflect.Bool {
-			return false, nil
 		}
 		return nil, nil
 	}
@@ -500,8 +519,9 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 				}
 				// String length constraints
 				if effectiveKind == reflect.String && gotKind == reflect.String {
+					strItem, _ := asString(it)
 					if elementMinPtr != nil {
-						actualLen := int64(utf8.RuneCountInString(it.(string)))
+						actualLen := int64(utf8.RuneCountInString(strItem))
 						if actualLen < *elementMinPtr {
 							if validator.CustomMsg.OnMin != nil {
 								return nil, buildMessage(*validator.CustomMsg.OnMin, MessageMeta{
@@ -514,7 +534,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 						}
 					}
 					if elementMaxPtr != nil {
-						actualLen := int64(utf8.RuneCountInString(it.(string)))
+						actualLen := int64(utf8.RuneCountInString(strItem))
 						if actualLen > *elementMaxPtr {
 							if validator.CustomMsg.OnMax != nil {
 								return nil, buildMessage(*validator.CustomMsg.OnMax, MessageMeta{
@@ -529,37 +549,8 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 				}
 				// Numeric value constraints
 				if isIntegerFamily(effectiveKind) && isIntegerFamily(gotKind) {
-					// normalize to float64 for comparison
-					var num float64
-					switch v := it.(type) {
-					case int:
-						num = float64(v)
-					case int8:
-						num = float64(v)
-					case int16:
-						num = float64(v)
-					case int32:
-						num = float64(v)
-					case int64:
-						num = float64(v)
-					case uint:
-						num = float64(v)
-					case uint8:
-						num = float64(v)
-					case uint16:
-						num = float64(v)
-					case uint32:
-						num = float64(v)
-					case uint64:
-						num = float64(v)
-					case float32:
-						num = float64(v)
-					case float64:
-						num = v
-					default:
-						// fallback: let validate handle
-						num = 0
-					}
+					// normalize to float64 for comparison (named-type safe)
+					num := numericAsFloat64(it)
 					if elementMinPtr != nil && num < float64(*elementMinPtr) {
 						if validator.CustomMsg.OnMin != nil {
 							actualLen := int64(num)
@@ -620,6 +611,19 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 		if maxPtr != nil && listLen > *maxPtr {
 			return nil, buildErrorMessagef(field, "should be or lower than %v", *maxPtr)
 		}
+		// enforce element uniqueness when declared via ListRules.Unique
+		if lr, ok := validator.List.(*rulesWrapper); ok && lr.ListRules.Unique {
+			for i := 0; i < len(sliceDataX); i++ {
+				for j := i + 1; j < len(sliceDataX); j++ {
+					if reflect.DeepEqual(sliceDataX[i], sliceDataX[j]) {
+						if validator.CustomMsg.OnUnique != nil {
+							return nil, buildMessage(*validator.CustomMsg.OnUnique, MessageMeta{Field: &field})
+						}
+						return nil, buildErrorMessage(field, "values must be unique")
+					}
+				}
+			}
+		}
 		return sliceDataX, nil
 	}
 
@@ -639,7 +643,8 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 		if err != nil {
 			return nil, err
 		}
-		if !regex.MatchString(data.(string)) {
+		strData, _ := asString(data)
+		if !regex.MatchString(strData) {
 			if validator.CustomMsg.OnRegexString != nil {
 				return nil, buildMessage(*validator.CustomMsg.OnRegexString, MessageMeta{Field: &field})
 			}
@@ -669,152 +674,52 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 		enumType := reflect.TypeOf(validator.Enum.Items)
 		if enumType.Kind() == reflect.Slice {
 			enumValue := reflect.ValueOf(validator.Enum.Items)
-			// Handle integer family coercion for HTTP JSON like regular type validation
-			if dataType != enumType.Elem().Kind() {
-				// Allow type mismatch for integer family from HTTP JSON
-				if coercesNumbers(dataFrom) &&
-					isIntegerFamily(enumType.Elem().Kind()) && isIntegerFamily(dataType) {
-					// Type coercion will be handled in the switch cases below
-				} else {
-					// Use custom message for type mismatch if available, otherwise use custom enum message or default
-					if validator.CustomMsg.OnTypeNotMatch != nil {
-						expectedType := enumType.Elem().Kind()
-						return nil, buildMessage(*validator.CustomMsg.OnTypeNotMatch, MessageMeta{
-							Field:        &field,
-							ExpectedType: &expectedType,
-							ActualType:   &dataType,
-						})
-					}
-					return nil, buildEnumErrorMessage(nil, enumType, dataType)
+			elemKind := enumType.Elem().Kind()
+
+			// Integer-family enums accept any integer-family value regardless of
+			// concrete or named type, from any source (map, JSON, form). Values
+			// are compared numerically so int64(2) matches IntEnum(1,2,3).
+			if isIntegerFamily(elemKind) && isIntegerFamily(dataType) {
+				dataNum := numericAsFloat64(data)
+				isFloatEnum := elemKind == reflect.Float32 || elemKind == reflect.Float64
+				// an integer enum cannot match a fractional value
+				if !isFloatEnum && dataNum != float64(int64(dataNum)) {
+					return nil, buildErrorMessage(field, "should be '"+elemKind.String()+"'")
 				}
+				var matched bool
+				for i := 0; i < enumValue.Len(); i++ {
+					if numericAsFloat64(enumValue.Index(i).Interface()) == dataNum {
+						matched = true
+						break
+					}
+				}
+				if !matched {
+					return nil, buildEnumErrorMessage(validator.Enum.Items, enumType, dataType)
+				}
+				return data, nil
 			}
 
-			// Handle cross-type enum validation for integer family from HTTP JSON
-			if coercesNumbers(dataFrom) &&
-				isIntegerFamily(enumType.Elem().Kind()) && isIntegerFamily(dataType) &&
-				dataType != enumType.Elem().Kind() {
-				// Convert float64 JSON data to compare with integer family enum items
-				if dataType == reflect.Float64 {
-					floatData := data.(float64)
-					enumKind := enumType.Elem().Kind()
-
-					// For float32 and float64, no integer conversion check needed
-					if enumKind == reflect.Float32 || enumKind == reflect.Float64 {
-						// Handle float enum types
-						switch enumKind {
-						case reflect.Float32:
-							var values []float32
-							for i := 0; i < enumValue.Len(); i++ {
-								values = append(values, float32(enumValue.Index(i).Float()))
-							}
-							if !valueInList[float32](values, float32(floatData), func(a, b float32) bool { return a == b }) {
-								return nil, buildEnumErrorMessage(values, enumType, dataType)
-							}
-						case reflect.Float64:
-							var values []float64
-							for i := 0; i < enumValue.Len(); i++ {
-								values = append(values, enumValue.Index(i).Float())
-							}
-							if !valueInList[float64](values, floatData, isEqualFloat64) {
-								return nil, buildEnumErrorMessage(values, enumType, dataType)
-							}
-						}
-						return data, nil
-					}
-
-					// Check if float64 can be safely converted to integer (no decimal part)
-					if floatData == float64(int64(floatData)) {
-						// Handle different integer enum types
-						switch enumType.Elem().Kind() {
-						case reflect.Int:
-							var values []int
-							for i := 0; i < enumValue.Len(); i++ {
-								values = append(values, int(enumValue.Index(i).Int()))
-							}
-							if !valueInList[int](values, int(floatData), isEqualInt) {
-								return nil, buildEnumErrorMessage(values, enumType, dataType)
-							}
-						case reflect.Int64:
-							var values []int64
-							for i := 0; i < enumValue.Len(); i++ {
-								values = append(values, enumValue.Index(i).Int())
-							}
-							if !valueInList[int64](values, int64(floatData), isEqualInt64) {
-								return nil, buildEnumErrorMessage(values, enumType, dataType)
-							}
-						case reflect.Int32:
-							var values []int32
-							for i := 0; i < enumValue.Len(); i++ {
-								values = append(values, int32(enumValue.Index(i).Int()))
-							}
-							if !valueInList[int32](values, int32(floatData), func(a, b int32) bool { return a == b }) {
-								return nil, buildEnumErrorMessage(values, enumType, dataType)
-							}
-						case reflect.Int16:
-							var values []int16
-							for i := 0; i < enumValue.Len(); i++ {
-								values = append(values, int16(enumValue.Index(i).Int()))
-							}
-							if !valueInList[int16](values, int16(floatData), func(a, b int16) bool { return a == b }) {
-								return nil, buildEnumErrorMessage(values, enumType, dataType)
-							}
-						case reflect.Int8:
-							var values []int8
-							for i := 0; i < enumValue.Len(); i++ {
-								values = append(values, int8(enumValue.Index(i).Int()))
-							}
-							if !valueInList[int8](values, int8(floatData), func(a, b int8) bool { return a == b }) {
-								return nil, buildEnumErrorMessage(values, enumType, dataType)
-							}
-						case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8:
-							// Handle unsigned integers
-							var values []uint64
-							for i := 0; i < enumValue.Len(); i++ {
-								values = append(values, enumValue.Index(i).Uint())
-							}
-							if floatData < 0 || !valueInList[uint64](values, uint64(floatData), func(a, b uint64) bool { return a == b }) {
-								return nil, buildEnumErrorMessage(values, enumType, dataType)
-							}
-						}
-						return data, nil
-					} else {
-						// Float has decimal part, cannot convert to integer enum
-						return nil, buildErrorMessage(field, "should be '"+enumType.Elem().Kind().String()+"'")
-					}
+			if dataType != elemKind {
+				// Use custom message for type mismatch if available, otherwise use custom enum message or default
+				if validator.CustomMsg.OnTypeNotMatch != nil {
+					expectedType := elemKind
+					return nil, buildMessage(*validator.CustomMsg.OnTypeNotMatch, MessageMeta{
+						Field:        &field,
+						ExpectedType: &expectedType,
+						ActualType:   &dataType,
+					})
 				}
+				return nil, buildEnumErrorMessage(validator.Enum.Items, enumType, dataType)
 			}
 
 			switch dataType {
-			case reflect.Int:
-				var values []int
-				for i := 0; i < enumValue.Len(); i++ {
-					values = append(values, int(enumValue.Index(i).Int()))
-				}
-				if !valueInList[int](values, data.(int), isEqualInt) {
-					return nil, buildEnumErrorMessage(values, enumType, dataType)
-				}
-			case reflect.Int64:
-				var values []int64
-				for i := 0; i < enumValue.Len(); i++ {
-					values = append(values, enumValue.Index(i).Int())
-				}
-				if !valueInList[int64](values, data.(int64), isEqualInt64) {
-					return nil, buildEnumErrorMessage(values, enumType, dataType)
-				}
-			case reflect.Float64:
-				var values []float64
-				for i := 0; i < enumValue.Len(); i++ {
-					values = append(values, enumValue.Index(i).Float())
-				}
-				if !valueInList[float64](values, data.(float64), isEqualFloat64) {
-					return nil, buildEnumErrorMessage(values, enumType, dataType)
-				}
 			case reflect.String:
 				var values []string
 				for i := 0; i < enumValue.Len(); i++ {
 					values = append(values, enumValue.Index(i).String())
 				}
-				if !valueInList[string](values, data.(string), isEqualString) {
+				strData, _ := asString(data)
+				if !valueInList[string](values, strData, isEqualString) {
 					return nil, buildEnumErrorMessage(values, enumType, dataType)
 				}
 			default:
@@ -845,7 +750,8 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 	}
 
 	if validator.Email {
-		if reflect.TypeOf(data).Kind() != reflect.String || !isEmail(data.(string)) {
+		strData, ok := asString(data)
+		if !ok || !isEmail(strData) {
 			return nil, buildErrorMessage(field, "is not valid email")
 		}
 	}
@@ -931,15 +837,33 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 		var actualLength int64
 		err := buildErrorMessagef(field, "should be or greater than %v", *validator.Min)
 		if reflect.String == dataType {
-			if total := utf8.RuneCountInString(data.(string)); int64(total) < *validator.Min {
+			strData, _ := asString(data)
+			if total := utf8.RuneCountInString(strData); int64(total) < *validator.Min {
 				isErr = true
 				actualLength = int64(total)
 			}
 		} else if isIntegerFamily(dataType) {
-			num := extractInteger(data)
-			if num < *validator.Min {
-				isErr = true
-				actualLength = num
+			switch {
+			case dataType == reflect.Float32 || dataType == reflect.Float64:
+				// Compare floats without int64 truncation so 3.9 does not pass Max=3
+				num := reflect.ValueOf(data).Float()
+				if num < float64(*validator.Min) {
+					isErr = true
+					actualLength = int64(num)
+				}
+			case isUintKind(dataType):
+				// Compare in uint64 space: int64(v.Uint()) wraps huge values negative
+				u := reflect.ValueOf(data).Uint()
+				if *validator.Min >= 0 && u < uint64(*validator.Min) {
+					isErr = true
+					actualLength = int64(u)
+				}
+			default:
+				num := extractInteger(data)
+				if num < *validator.Min {
+					isErr = true
+					actualLength = num
+				}
 			}
 		} else if reflect.Slice == dataType {
 			total := int64(len(sliceData))
@@ -966,15 +890,33 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 		var actualLength int64
 		err := buildErrorMessagef(field, "should be or lower than %v", *validator.Max)
 		if reflect.String == dataType {
-			if total := utf8.RuneCountInString(data.(string)); int64(total) > *validator.Max {
+			strData, _ := asString(data)
+			if total := utf8.RuneCountInString(strData); int64(total) > *validator.Max {
 				isErr = true
 				actualLength = int64(total)
 			}
 		} else if isIntegerFamily(dataType) {
-			num := extractInteger(data)
-			if num > *validator.Max {
-				isErr = true
-				actualLength = num
+			switch {
+			case dataType == reflect.Float32 || dataType == reflect.Float64:
+				// Compare floats without int64 truncation so 3.9 does not pass Max=3
+				num := reflect.ValueOf(data).Float()
+				if num > float64(*validator.Max) {
+					isErr = true
+					actualLength = int64(num)
+				}
+			case isUintKind(dataType):
+				// Compare in uint64 space: int64(v.Uint()) wraps huge values negative
+				u := reflect.ValueOf(data).Uint()
+				if *validator.Max < 0 || u > uint64(*validator.Max) {
+					isErr = true
+					actualLength = int64(u)
+				}
+			default:
+				num := extractInteger(data)
+				if num > *validator.Max {
+					isErr = true
+					actualLength = num
+				}
 			}
 		} else if reflect.Slice == dataType {
 			total := int64(len(sliceData))
@@ -1050,6 +992,46 @@ func extractInteger(data interface{}) int64 {
 		return int64(v.Float())
 	}
 	return 0
+}
+
+// asString extracts a string from data that may hold a named string type
+// (e.g. type ID string). A hard data.(string) assertion panics on named
+// types even though their reflect.Kind matches.
+func asString(data interface{}) (string, bool) {
+	if s, ok := data.(string); ok {
+		return s, true
+	}
+	v := reflect.ValueOf(data)
+	if v.Kind() == reflect.String {
+		return v.String(), true
+	}
+	return "", false
+}
+
+// numericAsFloat64 converts any integer-family value (including named types)
+// to float64 for comparison purposes.
+func numericAsFloat64(data interface{}) float64 {
+	v := reflect.ValueOf(data)
+	switch v.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return float64(v.Int())
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return float64(v.Uint())
+	case reflect.Float32, reflect.Float64:
+		return v.Float()
+	}
+	return 0
+}
+
+// isUintKind reports whether k is an unsigned integer kind. Unsigned values
+// need their own comparison path: int64(v.Uint()) wraps values above
+// math.MaxInt64 to negative, silently defeating Min/Max checks.
+func isUintKind(k reflect.Kind) bool {
+	switch k {
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return true
+	}
+	return false
 }
 
 func convertValue(newValue interface{}, kind reflect.Kind, data reflect.Value, pointer bool) error {
