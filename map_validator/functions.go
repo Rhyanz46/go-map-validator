@@ -270,9 +270,15 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, state *wrapperR
 
 	// if list
 	if rule.Object != nil && res != nil {
+		objRes, ok := res.(map[string]interface{})
+		if !ok {
+			// a rule carrying both Object and ListObject can land here with a
+			// slice — report a validation error instead of panicking
+			return nil, buildErrorMessage(key, "is not valid object")
+		}
 		innerState := newWrapperRunState()
 		for keyX, ruleX := range rule.Object.getRules() {
-			_, err = validateRecursive(cChain, rule.Object, innerState, keyX, res.(map[string]interface{}), ruleX, fromJSONEncoder)
+			_, err = validateRecursive(cChain, rule.Object, innerState, keyX, objRes, ruleX, fromJSONEncoder)
 			if err != nil {
 				return nil, err
 			}
@@ -280,7 +286,11 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, state *wrapperR
 	}
 
 	if rule.ListObject != nil && res != nil {
-		listRes := res.([]interface{})
+		listRes, ok := res.([]interface{})
+		if !ok {
+			// symmetric guard for a rule carrying both Object and ListObject
+			return nil, buildErrorMessage(key, "is not valid list object")
+		}
 		var manipulated []interface{}
 		for _, xRes := range listRes {
 			if m, ok := xRes.(map[string]interface{}); ok {
@@ -291,6 +301,18 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, state *wrapperR
 					_, err = validateRecursive(tmpChain, rule.ListObject, itemState, keyX, m, ruleX, fromJSONEncoder)
 					if err != nil {
 						return nil, err
+					}
+				}
+				// The item chain is detached from the root chain, so run its
+				// manipulators and unique checks locally — otherwise they are
+				// silently skipped by the root-level traversal in RunValidate.
+				if err = tmpChain.GetResult().RunManipulator(); err != nil {
+					return nil, err
+				}
+				tmpChain.GetResult().RunUniqueChecker()
+				for _, itemErr := range tmpChain.GetResult().GetErrors() {
+					if itemErr != nil {
+						return nil, itemErr
 					}
 				}
 				// collect validated/manipulated item data back into the slice
@@ -620,6 +642,19 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 		if maxPtr != nil && listLen > *maxPtr {
 			return nil, buildErrorMessagef(field, "should be or lower than %v", *maxPtr)
 		}
+		// enforce element uniqueness when declared via ListRules.Unique
+		if lr, ok := validator.List.(*rulesWrapper); ok && lr.ListRules.Unique {
+			for i := 0; i < len(sliceDataX); i++ {
+				for j := i + 1; j < len(sliceDataX); j++ {
+					if reflect.DeepEqual(sliceDataX[i], sliceDataX[j]) {
+						if validator.CustomMsg.OnUnique != nil {
+							return nil, buildMessage(*validator.CustomMsg.OnUnique, MessageMeta{Field: &field})
+						}
+						return nil, buildErrorMessage(field, "values must be unique")
+					}
+				}
+			}
+		}
 		return sliceDataX, nil
 	}
 
@@ -936,10 +971,19 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 				actualLength = int64(total)
 			}
 		} else if isIntegerFamily(dataType) {
-			num := extractInteger(data)
-			if num < *validator.Min {
-				isErr = true
-				actualLength = num
+			if dataType == reflect.Float32 || dataType == reflect.Float64 {
+				// Compare floats without int64 truncation so 3.9 does not pass Max=3
+				num := reflect.ValueOf(data).Float()
+				if num < float64(*validator.Min) {
+					isErr = true
+					actualLength = int64(num)
+				}
+			} else {
+				num := extractInteger(data)
+				if num < *validator.Min {
+					isErr = true
+					actualLength = num
+				}
 			}
 		} else if reflect.Slice == dataType {
 			total := int64(len(sliceData))
@@ -971,10 +1015,19 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 				actualLength = int64(total)
 			}
 		} else if isIntegerFamily(dataType) {
-			num := extractInteger(data)
-			if num > *validator.Max {
-				isErr = true
-				actualLength = num
+			if dataType == reflect.Float32 || dataType == reflect.Float64 {
+				// Compare floats without int64 truncation so 3.9 does not pass Max=3
+				num := reflect.ValueOf(data).Float()
+				if num > float64(*validator.Max) {
+					isErr = true
+					actualLength = int64(num)
+				}
+			} else {
+				num := extractInteger(data)
+				if num > *validator.Max {
+					isErr = true
+					actualLength = num
+				}
 			}
 		} else if reflect.Slice == dataType {
 			total := int64(len(sliceData))
