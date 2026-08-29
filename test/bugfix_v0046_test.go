@@ -44,6 +44,21 @@ func TestFormFlagBasedRules(t *testing.T) {
 	if _, err := op2.RunValidate(); err == nil {
 		t.Fatal("expected invalid email to fail validation")
 	}
+
+	// NestedObject and List rules must be rejected early with ErrUnsupportType
+	nestedRules := map_validator.BuildRoles().
+		SetRule("nested", map_validator.NestedObject(map_validator.BuildRoles().SetRule("a", map_validator.Str()).Done())).
+		Done()
+	if _, err := map_validator.NewValidateBuilder().SetRules(nestedRules).LoadFormHttp(req); err != map_validator.ErrUnsupportType {
+		t.Fatalf("expected ErrUnsupportType for form+NestedObject, got %v", err)
+	}
+
+	listRules := map_validator.BuildRoles().
+		SetRule("tags", map_validator.List(map_validator.Str())).
+		Done()
+	if _, err := map_validator.NewValidateBuilder().SetRules(listRules).LoadFormHttp(req); err != map_validator.ErrUnsupportType {
+		t.Fatalf("expected ErrUnsupportType for form+List, got %v", err)
+	}
 }
 
 // Bug 2: WithMax on float fields truncated the value (3.9 -> 3) so values in
