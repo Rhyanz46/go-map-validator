@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to incremental patch versioning (`v0.0.x`).
 
+## [v0.0.46]
+
+A bug-fix release. No public API additions. Ten defects fixed across two
+themes: rules that were silently not enforced, and panics/incorrect results
+on edge-case inputs. One behavioral correction (nullable `Bool` null-field
+reporting) changes `GetFilledField()` output for a previously-misclassified
+case — see Migration notes.
+
+### Fixed
+
+- **Forms no longer reject flag-based rules.** `LoadFormHttp` gated on `rule.Type` being `String`/`Bool`/integer-family, so `Email()`, `UUID()`, `IPv4()`, `.Regex()`, and enum-only rules — whose `Type` is the zero value because they validate string *content* — always failed with `ErrUnsupportType`. They are now accepted and validated as strings.
+- **Float values no longer bypass `Max` via truncation.** Min/Max comparisons converted floats with `int64(v)`, so `3.9` passed `WithMax(3)` — every value in `(max, max+1)` was wrongly accepted. Floats are now compared as `float64`.
+- **`uint64` values above `math.MaxInt64` no longer bypass Min/Max.** `int64(v.Uint())` wrapped huge values to negative, so a gigantic `uint64` passed `WithMax(100)` and could wrongly fail a small `WithMin`. Unsigned values are now compared in `uint64` space.
+- **Manipulators declared on `ListObject` item rules now run.** Each list item was validated on a detached chain that the root-level `RunManipulator()` traversal never reached, so item manipulators were silently skipped.
+- **`Unique` across sibling fields inside `ListObject` items is now enforced.** Same root cause as the manipulator skip — the unique checker never visited item chains.
+- **`ListRules.Unique` is now enforced.** The field was settable via `BuildListRoles().SetListRule(ListRules{Unique: true})` but had no reader, so duplicate list elements were never rejected. Duplicates are detected with `reflect.DeepEqual` and honor `CustomMsg.OnUnique`.
+- **Named string/int types no longer panic.** Hard assertions like `data.(string)` panicked on values such as `type ID string` even though their `reflect.Kind` matched the rule. Affected paths: `Regex`, `Email`, string Min/Max, `StrEnum`/`IntEnum`, and primitive list element checks. All extraction is now kind-safe (`UUID`/`IPv4` were already safe).
+- **Integer enums now coerce from any source, not just JSON.** `IntEnum(1, 2, 3)` previously rejected `int64(2)` from `Load(map)` because cross-type integer coercion only applied to HTTP JSON/form sources. Integer-family enum values are now compared numerically regardless of concrete type or source.
+- **Enum type-mismatch error no longer prints `list<nil>`.** The mismatch path passed `nil` instead of the enum values into the message builder.
+- **A rule carrying both `Object` and `ListObject` no longer panics.** The conflicting configuration now returns a validation error instead of a type-assertion panic.
+
+### Behavior change
+
+- **A missing nullable `Bool` is now reported as a null field.** Previously `Bool().Nullable()` returned `false` (non-nil) for an absent field, so `GetFilledField()` included it and `GetNullField()` did not — inconsistent with every other type. It now returns `nil`, so the field appears in `GetNullField()`.
+
+### Internal
+
+- New helpers: `asString` (kind-safe string extraction), `numericAsFloat64`, `isUintKind`.
+- The enum validation block (~158 lines of per-kind duplication with a JSON-only coercion path) was replaced by a single unified numeric comparison (~60 lines).
+- `ListObject` item validation now runs `RunManipulator()` and `RunUniqueChecker()` locally on each item chain.
+- Added regression tests in `test/bugfix_v0046_test.go` (6 tests) and `test/bugfix2_v0046_test.go` (4 tests, one table-driven with 7 sub-cases). Full suite: 167 tests green, race-detector clean; no existing test required modification.
+
+### Migration notes
+
+- No code changes required for existing callers.
+- Payloads that previously *passed incorrectly* are now *correctly rejected*: floats above `Max`, huge `uint64` values outside Min/Max, duplicate elements in `ListRules.Unique` lists, and duplicate values across `UniqueFrom` siblings inside `ListObject` items.
+- Payloads that previously *failed incorrectly* now pass: flag-based rules in forms, named string/int types, and integer-family enum values of a different concrete type (e.g. `int64` against `IntEnum`).
+- **Action may be needed** if you read `GetFilledField()` for nullable `Bool` fields: absent bools move from the filled list to the null list. Adjust any logic that depended on the old classification.
+
 ## [v0.0.45]
 
 A bug-fix release. No public API additions; two behavior corrections are
