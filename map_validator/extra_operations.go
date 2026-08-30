@@ -79,5 +79,8 @@ func (state *ExtraOperationData) GetNullField() []string {
 }
 
 func (state *ExtraOperationData) GetData() map[string]interface{} {
+	if state == nil || state.data == nil {
+		return map[string]interface{}{}
+	}
 	return *state.data
 }

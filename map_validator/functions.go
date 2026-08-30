@@ -19,18 +19,6 @@ func isEqualString(current, allowedField string) bool {
 	return current == allowedField
 }
 
-func isEqualFloat64(current, allowedField float64) bool {
-	return current == allowedField
-}
-
-func isEqualInt(current, allowedField int) bool {
-	return current == allowedField
-}
-
-func isEqualInt64(current, allowedField int64) bool {
-	return current == allowedField
-}
-
 func isEmail(email string) bool {
 	ok := strings.Contains(email, "@")
 	if !ok {
@@ -440,7 +428,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 
 	// validatorType type validation
 	dataType := reflect.TypeOf(data).Kind()
-	handleIntOnHttpJson := coercesNumbers(dataFrom) && isIntegerFamily(validator.Type) && isIntegerFamily(dataType)
+	handleIntOnHttpJson := integerCoercion(dataFrom, validator.Type, dataType)
 	customData := !(!validator.UUID &&
 		!validator.IPV4 &&
 		!validator.UUIDToString &&
@@ -527,7 +515,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 								return nil, buildMessage(*validator.CustomMsg.OnMin, MessageMeta{
 									Field:             &field,
 									ExpectedMinLength: elementMinPtr,
-									ActualLength:      &actualLen,
+									ActualLength:      anyPtr(actualLen),
 								})
 							}
 							return nil, buildErrorMessagef(field, "should be or greater than %v", *elementMinPtr)
@@ -540,7 +528,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 								return nil, buildMessage(*validator.CustomMsg.OnMax, MessageMeta{
 									Field:             &field,
 									ExpectedMaxLength: elementMaxPtr,
-									ActualLength:      &actualLen,
+									ActualLength:      anyPtr(actualLen),
 								})
 							}
 							return nil, buildErrorMessagef(field, "should be or lower than %v", *elementMaxPtr)
@@ -557,7 +545,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 							return nil, buildMessage(*validator.CustomMsg.OnMin, MessageMeta{
 								Field:             &field,
 								ExpectedMinLength: elementMinPtr,
-								ActualLength:      &actualLen,
+								ActualLength:      anyPtr(actualLen),
 							})
 						}
 						return nil, buildErrorMessagef(field, "should be or greater than %v", *elementMinPtr)
@@ -568,7 +556,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 							return nil, buildMessage(*validator.CustomMsg.OnMax, MessageMeta{
 								Field:             &field,
 								ExpectedMaxLength: elementMaxPtr,
-								ActualLength:      &actualLen,
+								ActualLength:      anyPtr(actualLen),
 							})
 						}
 						return nil, buildErrorMessagef(field, "should be or lower than %v", *elementMaxPtr)
@@ -580,7 +568,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 			if it != nil && tmpRule.Type != reflect.Invalid {
 				gotKind := reflect.TypeOf(it).Kind()
 				expectedKind := tmpRule.Type
-				allowIntCoerce := coercesNumbers(dataFrom) && isIntegerFamily(expectedKind) && isIntegerFamily(gotKind)
+				allowIntCoerce := integerCoercion(dataFrom, expectedKind, gotKind)
 				if gotKind != expectedKind && !allowIntCoerce {
 					// Map kind to human-friendly noun (e.g., int/uint/float -> integer)
 					noun := expectedKind.String()
@@ -812,10 +800,6 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 		return nil, errMsg
 	}
 
-	if !validator.Null && reflect.TypeOf(data).Kind() == reflect.Bool && data == nil {
-		return false, nil
-	}
-
 	// legacy ListObject fallback occurs via early list handling
 	if validator.AnonymousObject || validator.Object != nil {
 		res, err := toMapStringInterface(data)
@@ -834,7 +818,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 
 	if validator.Min != nil && data != nil {
 		var isErr bool
-		var actualLength int64
+		var actualLength interface{}
 		err := buildErrorMessagef(field, "should be or greater than %v", *validator.Min)
 		if reflect.String == dataType {
 			strData, _ := asString(data)
@@ -856,7 +840,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 				u := reflect.ValueOf(data).Uint()
 				if *validator.Min >= 0 && u < uint64(*validator.Min) {
 					isErr = true
-					actualLength = int64(u)
+					actualLength = u
 				}
 			default:
 				num := extractInteger(data)
@@ -878,7 +862,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 				return nil, buildMessage(*validator.CustomMsg.OnMin, MessageMeta{
 					Field:             &field,
 					ExpectedMinLength: SetTotal(*validator.Min),
-					ActualLength:      SetTotal(actualLength),
+					ActualLength:      anyPtr(actualLength),
 				})
 			}
 			return nil, err
@@ -887,7 +871,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 
 	if validator.Max != nil && data != nil {
 		var isErr bool
-		var actualLength int64
+		var actualLength interface{}
 		err := buildErrorMessagef(field, "should be or lower than %v", *validator.Max)
 		if reflect.String == dataType {
 			strData, _ := asString(data)
@@ -909,7 +893,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 				u := reflect.ValueOf(data).Uint()
 				if *validator.Max < 0 || u > uint64(*validator.Max) {
 					isErr = true
-					actualLength = int64(u)
+					actualLength = u
 				}
 			default:
 				num := extractInteger(data)
@@ -931,7 +915,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 				return nil, buildMessage(*validator.CustomMsg.OnMax, MessageMeta{
 					Field:             &field,
 					ExpectedMaxLength: SetTotal(*validator.Max),
-					ActualLength:      SetTotal(actualLength),
+					ActualLength:      anyPtr(actualLength),
 				})
 			}
 			return nil, err
@@ -946,6 +930,10 @@ func SetTotal(total int64) *int64 {
 }
 
 func SetMessage(msg string) *string { return &msg }
+
+// anyPtr boxes a value into *interface{} for MessageMeta length fields that may
+// hold int64 or uint64, so huge uint64 values format without int64 overflow.
+func anyPtr(v interface{}) *interface{} { return &v }
 
 func toInterfaceSlice(slice interface{}) ([]interface{}, bool) {
 
@@ -1034,177 +1022,6 @@ func isUintKind(k reflect.Kind) bool {
 	return false
 }
 
-func convertValue(newValue interface{}, kind reflect.Kind, data reflect.Value, pointer bool) error {
-	errNotSupport := errors.New("not support data")
-	switch kind {
-	case reflect.Int:
-		converted, ok := newValue.(float64)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetInt(int64(converted))
-		}
-	case reflect.Int8:
-		converted, ok := newValue.(int64)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetInt(converted)
-		}
-	case reflect.Int16:
-		converted, ok := newValue.(int64)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetInt(converted)
-		}
-	case reflect.Int32:
-		converted, ok := newValue.(int64)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetInt(converted)
-		}
-	case reflect.Int64:
-		converted, ok := newValue.(int64)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetInt(converted)
-		}
-	case reflect.Uint:
-		converted, ok := newValue.(float64)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetUint(uint64(converted))
-		}
-	case reflect.Uint8:
-		converted, ok := newValue.(float64)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetUint(uint64(converted))
-		}
-	case reflect.Uint16:
-		converted, ok := newValue.(float64)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetUint(uint64(converted))
-		}
-	case reflect.Uint32:
-		converted, ok := newValue.(float64)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetUint(uint64(converted))
-		}
-	case reflect.Uint64:
-		converted, ok := newValue.(float64)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetUint(uint64(converted))
-		}
-	case reflect.Float32:
-		converted, ok := newValue.(float64)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetFloat(float64(converted))
-		}
-	case reflect.Float64:
-		converted, ok := newValue.(float64)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetFloat(converted)
-		}
-	case reflect.String:
-		converted, ok := newValue.(string)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetString(converted)
-		}
-	case reflect.Bool:
-		converted, ok := newValue.(bool)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetBool(converted)
-		}
-	case reflect.Complex64:
-		converted, ok := newValue.(complex128)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetComplex(complex128(complex64(converted)))
-		}
-	case reflect.Complex128:
-		converted, ok := newValue.(complex128)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetComplex(converted)
-		}
-	case reflect.Interface:
-		data.Set(reflect.ValueOf(newValue))
-	default:
-		return errNotSupport
-	}
-	return nil
-}
-
 func getAllKeys(data map[string]interface{}) (allKeysInMap []string) {
 	for key, _ := range data {
 		allKeysInMap = append(allKeysInMap, key)
@@ -1227,6 +1044,18 @@ func isDataInList[T validatorType](key T, data []T) (result bool) {
 // same way in LoadFormHttp, so they qualify too.
 func coercesNumbers(dataFrom loadFromType) bool {
 	return dataFrom == fromHttpJson || dataFrom == fromJSONEncoder || dataFrom == fromHttpMultipartForm
+}
+
+// integerCoercion reports whether an integer rule should accept the given
+// actual kind. JSON/form sources decode all numbers as float64, so integer
+// rules there tolerate any integer-family kind (including float). Map sources
+// keep exact types, so only integer kinds (int/int64/uint/...) cross-coerce —
+// a float for an int rule is still rejected.
+func integerCoercion(dataFrom loadFromType, expected, actual reflect.Kind) bool {
+	if coercesNumbers(dataFrom) && isIntegerFamily(expected) && isIntegerFamily(actual) {
+		return true
+	}
+	return dataFrom == fromMapString && isIntegerKind(expected) && isIntegerKind(actual)
 }
 
 // coerceFormValue normalizes a raw form string into the JSON-like primitive the
@@ -1253,6 +1082,19 @@ func isIntegerFamily(dataType reflect.Kind) bool {
 		reflect.Int32, reflect.Int64, reflect.Uint,
 		reflect.Uint8, reflect.Uint16, reflect.Uint32,
 		reflect.Uint64, reflect.Float32, reflect.Float64:
+		return true
+	}
+	return false
+}
+
+// isIntegerKind is the integer-family predicate WITHOUT floats: true only for
+// the signed/unsigned integer kinds. Used for map-source cross-coercion where
+// floats must keep their exact (float64) type check.
+func isIntegerKind(dataType reflect.Kind) bool {
+	switch dataType {
+	case reflect.Int, reflect.Int8, reflect.Int16,
+		reflect.Int32, reflect.Int64, reflect.Uint,
+		reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		return true
 	}
 	return false

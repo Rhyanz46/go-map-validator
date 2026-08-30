@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to incremental patch versioning (`v0.0.x`).
 
+## [v0.0.47]
+
+A bug-fix release. No public API additions. Four non-breaking fixes: two
+correctness fixes (integer coercion from maps, `uint64` message overflow), one
+defensive guard, and dead-code cleanup.
+
+### Fixed
+
+- **Integer rules now coerce sibling integer kinds from `Load(map)`.** `Int()` / `Int64()` rejected values such as `int64`, `int32`, `uint`, or `uint64` coming from plain Go maps, reporting `"should be 'int'"` even though the value was a valid integer. This was inconsistent with JSON/form sources (which decode numbers as `float64`) and with `IntEnum`. Integer kinds now cross-coerce from map sources; **floats are still rejected** for integer rules from maps (integer-only coercion — no float→int loosening).
+- **`uint64` values in `${actual_length}` no longer wrap negative.** A huge `uint64` above `math.MaxInt64` shown through a custom Min/Max message displayed as a negative number (e.g. `-9223372036854775709`). The message now reports the correct unsigned value.
+- **`GetData()` no longer panics on a nil-data state.** Calling `GetData()` on a zero-value `ExtraOperationData` dereferenced a nil pointer; it now returns an empty map, consistent with `GetFilledField()` / `GetNullField()`.
+
+### Internal
+
+- New helpers: `isIntegerKind` (integer kinds without floats) and `integerCoercion` (the shared JSON-vs-map coercion decision).
+- `MessageMeta.ActualLength` widened from `*int64` to `*interface{}` so Min/Max messages can carry either signed or unsigned lengths.
+- Removed dead code: `isEqualInt` / `isEqualInt64` / `isEqualFloat64`, the unused `convertValue` function, and an unreachable boolean branch.
+- Added regression tests in `test/bugfix_v0047_test.go` (5 tests, one table-driven).
+
+### Migration notes
+
+- No code changes required for existing callers.
+- `Int()` / `Int64()` rules now accept integer-kind values (e.g. `int64`, `uint`) from `Load(map)` that previously errored — this only makes previously-rejected payloads pass, so it is non-breaking.
+
 ## [v0.0.46]
 
 A bug-fix release. No public API additions. Ten defects fixed across two

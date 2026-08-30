@@ -66,6 +66,15 @@ _ = result.Bind(&dto2)
 - **`List(elem)` and `Any()`** — primitive list helper and passthrough escape hatch for fields that should survive whitelist binding.
 - **Safe for shared & concurrent use** — rules no longer hold per-call state, so a single `rules` value can be declared as a package-level var and reused across handlers and goroutines.
 
+## What's new in v0.0.47
+
+A small non-breaking bug-fix release.
+
+**Bug Fixes & Robustness**
+- **Integer coercion from maps**: `Int()` / `Int64()` now accept sibling integer kinds (`int32`, `int64`, `uint`, `uint64`) from `Load(map)`, matching `IntEnum` and JSON/form behavior. Floats are still rejected for integer rules from maps.
+- **`uint64` message correctness**: custom Min/Max messages no longer show huge `uint64` values as negative numbers.
+- **`GetData()` safety**: a zero-value `ExtraOperationData` returns an empty map instead of panicking.
+
 ## What's new in v0.0.46
 
 A comprehensive bug-fix release addressing 10 silent defects and numeric edge cases with zero breaking API changes.
