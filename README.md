@@ -53,7 +53,7 @@ _ = result.Bind(&dto2)
 - Types via `reflect.Kind` with nullable fields (`Null`) and default (`IfNull`).
 - `Enum`, `RegexString`, `Email`, `UUID`/`UUIDToString`.
 - IPv4 validators: `IPV4`, `IPV4Network` (.0 network), `IPv4OptionalPrefix` (CIDR optional).
-- `Min`/`Max` for strings, numeric, and slices.
+- `Min`/`Max` — string length, numeric value, or item count for slices/lists (including `ListObject` and chained format rules).
 - Nested object (`Object`) and list of object (`ListObject`).
 - Uniqueness across sibling fields (`Unique`).
 - Conditional required: `RequiredWithout` and `RequiredIf`.
@@ -65,6 +65,8 @@ _ = result.Bind(&dto2)
 - **`ValidateJSON[T]`** — generic one-liner that collapses the Load → Validate → Bind pipeline for HTTP handlers.
 - **`List(elem)` and `Any()`** — primitive list helper and passthrough escape hatch for fields that should survive whitelist binding.
 - **Safe for shared & concurrent use** — rules no longer hold per-call state, so a single `rules` value can be declared as a package-level var and reused across handlers and goroutines.
+- **Multipart files survive `Bind()`** — `FileRequest` fields keep the open file handle and metadata.
+- **Deterministic errors** — rule keys are evaluated in sorted order; strict-mode unknown keys are reported first.
 
 ## What's new in v0.0.48
 
@@ -149,7 +151,7 @@ var dto MyDTO
 _ = extra.Bind(&dto)
 ```
 
-Note: JSON numbers decode as `float64`. The validator tolerates integer-family comparisons when rules expect an int kind.
+Note: JSON numbers decode as `float64` within float64's exact range; integer literals beyond 2^53 are preserved as `int64` end-to-end, so large IDs never lose precision. Integer rules accept whole numbers from JSON and reject fractional values (`2.5` fails an `Int()` rule).
 
 ## One-liner for JSON handlers
 
@@ -242,6 +244,8 @@ if err != nil { panic(err) }
 
 When using `ListObject`, the input must be an array of objects. Sending a single object yields: `"field 'goods' is not valid list object"`.
 
+Since v0.0.48, `List(NestedObject(item))` is an equivalent spelling — the item rules come from the inner object and container bounds chain via `.WithMin`/`.WithMax`.
+
 ## Whitelist Binding & Escape Hatches
 
 `map_validator` performs **whitelist binding**: only fields declared via `SetRule()` survive into the bound struct. Fields present in the JSON body but not in the rules are silently filtered out before `Bind()`.
@@ -314,6 +318,8 @@ rules := map_validator.BuildRoles().
     SetRule("custom_flavor", map_validator.Rules{Type: reflect.String, RequiredIf: []string{"flavor"}}).
     Done()
 ```
+
+Dependency fields don't need their own `Rules` entry — the conditional check runs against the payload itself, so an undeclared dependency still triggers the requirement when it is absent (`RequiredWithout`) or filled (`RequiredIf`).
 
 ## Custom Messages
 
@@ -427,8 +433,8 @@ Set `Setting{Strict:true}` in a rules group to reject any unknown keys at that o
 
 ## Notes & Caveats
 
-- JSON numbers decode as `float64`. Integer-family kinds are tolerated on JSON input.
-- `LoadFormHttp`: non-file values arrive as strings; there is no automatic string→int/float/bool parsing. Use a manipulator or extension to convert.
+- JSON numbers decode as `float64` within float64's exact range; integer literals beyond 2^53 are preserved as `int64` end-to-end. Integer rules accept whole numbers and reject fractional values.
+- `LoadFormHttp` auto-coerces scalar values: numbers become `float64` (integers beyond 2^53 stay `int64`), booleans become `bool`; unparseable values stay strings and fail the declared type check. Compound rules (`Object`, `ListObject`, `List`) are rejected with `ErrUnsupportType`, and file fields bind through `Bind()` as `FileRequest`.
 - Email validation is simple (checks `@` and `.`), not full RFC compliance.
 - Error reporting returns the first encountered error (no multi-error aggregation with field paths yet). Evaluation order is deterministic: rule keys are validated in sorted order and strict-mode unknown-key errors are reported first.
 - Custom messages are not yet available for: null errors and specific `RequiredWithout` / `RequiredIf` messages.

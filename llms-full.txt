@@ -110,12 +110,12 @@ func (r Rules) WithRequiredWithout(fields ...string) Rules // required when thes
 - `Null: false` (default) — field is required. `nil` / missing raises `"we need '<field>' field"`.
 - `Null: true` (`.Nullable()`) — field may be absent. Behavior:
   - `IfNull` set + `NilIfNull: false` (default) → returns `IfNull` value
-  - `IfNull` not set → returns `nil` (or `false` if `Type: reflect.Bool`)
+  - `IfNull` not set → returns `nil` (a missing nullable `Bool` is reported as a null field, not `false`)
   - `NilIfNull: true` → returns `nil` regardless of `IfNull`
 
 ### Integer family coercion
 
-JSON numbers decode as `float64`. When rules expect any integer kind (`reflect.Int`, `Int8`..`Int64`, `Uint`..`Uint64`, `Float32`, `Float64`), the validator accepts the incoming `float64` from JSON. No manual conversion needed.
+JSON numbers decode as `float64` within float64's exact range; integer literals beyond 2^53 are preserved as `int64` end-to-end, so large IDs never lose precision. When rules expect any integer kind (`reflect.Int`, `Int8`..`Int64`, `Uint`..`Uint64`, `Float32`, `Float64`), the validator accepts whole numbers from JSON and rejects fractional values (`2.5` fails an `Int()` rule). No manual conversion needed.
 
 Example: rule `Int()` accepts JSON `"port": 80` (float64 under the hood) as valid int.
 
