@@ -3,6 +3,7 @@ package map_validator
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"reflect"
 )
@@ -53,6 +54,11 @@ func (state *dataState) Load(data map[string]interface{}) (*finalOperation, erro
 	if state == nil || state.rules == nil || len(state.rules.getRules()) == 0 {
 		return nil, ErrNoRules
 	}
+	if data == nil {
+		// A nil payload behaves like an empty one so required-field errors
+		// surface from validation instead of a misleading "no data" error.
+		data = make(map[string]interface{})
+	}
 	//if state.strictAllowedValue {
 	//	if err := state.checkStrictKeys(data); err != nil {
 	//		return nil, err
@@ -95,13 +101,23 @@ func (state *dataState) LoadJsonHttp(r *http.Request) (*finalOperation, error) {
 		}
 	}
 	var mapData map[string]interface{}
-	err := json.NewDecoder(r.Body).Decode(&mapData)
+	decoder := json.NewDecoder(r.Body)
+	// UseNumber keeps integer literals beyond float64's exact range intact;
+	// normalizeJSONNumbers then restores plain Go types.
+	decoder.UseNumber()
+	err := decoder.Decode(&mapData)
 	if err != nil {
-		if err.Error() != "EOF" {
+		if errors.Is(err, io.EOF) {
+			mapData = make(map[string]interface{})
+		} else {
 			return nil, ErrInvalidJsonFormat
 		}
+	}
+	if mapData == nil {
+		// a body of literal `null` decodes to a nil map — treat it as empty
 		mapData = make(map[string]interface{})
 	}
+	normalizeJSONNumbers(mapData)
 	//if state.strictAllowedValue {
 	//	if err := state.checkStrictKeys(mapData); err != nil {
 	//		return nil, err
@@ -200,8 +216,14 @@ func (state *finalOperation) RunValidate() (*ExtraOperationData, error) {
 		}
 	}
 	topState := newWrapperRunState()
-	for key, rule := range state.rules.getRules() {
-		data, err := validateRecursive(initChain, state.rules, topState, key, state.data, rule, state.loadedFrom)
+	if state.rules.getSetting().Strict {
+		if err := checkStrictKeys(state.rules, state.data); err != nil {
+			return nil, err
+		}
+	}
+	rulesMap := state.rules.getRules()
+	for _, key := range sortedKeys(rulesMap) {
+		data, err := validateRecursive(initChain, state.rules, topState, key, state.data, rulesMap[key], state.loadedFrom)
 		if err != nil {
 			return nil, err
 		}

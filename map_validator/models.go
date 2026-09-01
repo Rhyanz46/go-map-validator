@@ -13,7 +13,7 @@ type manipulator struct {
 type MessageMeta struct {
 	Field             *string
 	ExpectedType      *reflect.Kind
-	ActualLength      *int64
+	ActualLength      *interface{}
 	ExpectedMinLength *int64
 	ExpectedMaxLength *int64
 	ActualType        *reflect.Kind

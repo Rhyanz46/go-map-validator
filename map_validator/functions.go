@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"reflect"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -16,18 +18,6 @@ import (
 )
 
 func isEqualString(current, allowedField string) bool {
-	return current == allowedField
-}
-
-func isEqualFloat64(current, allowedField float64) bool {
-	return current == allowedField
-}
-
-func isEqualInt(current, allowedField int) bool {
-	return current == allowedField
-}
-
-func isEqualInt64(current, allowedField int64) bool {
 	return current == allowedField
 }
 
@@ -51,7 +41,12 @@ func valueInList[T any](listData []T, data T, compare func(T, T) bool) bool {
 
 func isIPv4Valid(ip string) bool {
 	parsedIP := net.ParseIP(ip)
-	return parsedIP != nil && parsedIP.To4() != nil
+	if parsedIP == nil || parsedIP.To4() == nil {
+		return false
+	}
+	// ::ffff:a.b.c.d parses as an IPv4-mapped IPv6 address whose To4() is
+	// non-nil; only the dotted-quad form counts as IPv4 here.
+	return parsedIP.String() == ip
 }
 
 func isIPv4NetworkValid(ip string) bool {
@@ -162,18 +157,6 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, state *wrapperR
 	}
 	cChain := pChain.AddChild().SetKey(nodeKey)
 	var endOfLoop bool
-	if wrapper != nil && wrapper.getSetting().Strict {
-		var allowedKeys []string
-		keys := getAllKeys(data)
-		for XKey, _ := range wrapper.getRules() {
-			allowedKeys = append(allowedKeys, XKey)
-		}
-		for _, XKey := range keys {
-			if !isDataInList(XKey, allowedKeys) {
-				return nil, fmt.Errorf("'%s' is not allowed key", XKey)
-			}
-		}
-	}
 
 	res, err = validate(key, data, rule, loadedFrom)
 	if err != nil {
@@ -223,19 +206,28 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, state *wrapperR
 	}
 
 	if endOfLoop && state != nil && state.requiredWithout != nil {
-		for _, field := range state.nullFields {
-			var required bool
-			dependenciesField := state.requiredWithout[field]
-			if len(dependenciesField) == 0 {
+		deps := make([]string, 0, len(state.requiredWithout))
+		for dep := range state.requiredWithout {
+			deps = append(deps, dep)
+		}
+		sort.Strings(deps)
+		for _, dep := range deps {
+			// A dependency counts as filled when it is present in the scope
+			// data with a non-nil value — even when it was never declared as
+			// a rule. Restricting this to declared fields used to make the
+			// whole check a silent no-op for undeclared dependencies.
+			if depValue, ok := data[dep]; ok && depValue != nil {
 				continue
 			}
+			dependenciesField := state.requiredWithout[dep]
+			var required bool
 			for _, XField := range dependenciesField {
 				if isDataInList(XField, state.filledField) {
 					required = true
 				}
 			}
 			if !required {
-				return nil, fmt.Errorf("if field '%s' is null you need to put value in %v field", field, dependenciesField)
+				return nil, fmt.Errorf("if field '%s' is null you need to put value in %v field", dep, dependenciesField)
 			}
 		}
 	}
@@ -251,41 +243,58 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, state *wrapperR
 	}
 
 	if endOfLoop && state != nil && state.requiredIf != nil {
-		for _, field := range state.filledField {
-			var required bool
-			dependenciesField := state.requiredIf[field]
-			if len(dependenciesField) == 0 {
+		deps := make([]string, 0, len(state.requiredIf))
+		for dep := range state.requiredIf {
+			deps = append(deps, dep)
+		}
+		sort.Strings(deps)
+		for _, dep := range deps {
+			if depValue, ok := data[dep]; !ok || depValue == nil {
 				continue
 			}
+			dependenciesField := state.requiredIf[dep]
+			var required bool
 			for _, XField := range dependenciesField {
 				if !isDataInList(XField, state.nullFields) {
 					required = true
 				}
 			}
 			if !required {
-				return nil, fmt.Errorf("if field '%s' is filled you need to put value in %v field also", field, dependenciesField)
+				return nil, fmt.Errorf("if field '%s' is filled you need to put value in %v field also", dep, dependenciesField)
 			}
 		}
 	}
 
-	// if list
-	if rule.Object != nil && res != nil {
+	// nested object — a rule that also carries List belongs to the
+	// list-item branch below, where Object supplies the item rules
+	if rule.Object != nil && rule.List == nil && res != nil {
 		objRes, ok := res.(map[string]interface{})
 		if !ok {
 			// a rule carrying both Object and ListObject can land here with a
 			// slice — report a validation error instead of panicking
 			return nil, buildErrorMessage(key, "is not valid object")
 		}
+		if rule.Object.getSetting().Strict {
+			if err := checkStrictKeys(rule.Object, objRes); err != nil {
+				return nil, err
+			}
+		}
 		innerState := newWrapperRunState()
-		for keyX, ruleX := range rule.Object.getRules() {
-			_, err = validateRecursive(cChain, rule.Object, innerState, keyX, objRes, ruleX, fromJSONEncoder)
+		objRules := rule.Object.getRules()
+		for _, keyX := range sortedKeys(objRules) {
+			_, err = validateRecursive(cChain, rule.Object, innerState, keyX, objRes, objRules[keyX], fromJSONEncoder)
 			if err != nil {
 				return nil, err
 			}
 		}
 	}
 
-	if rule.ListObject != nil && res != nil {
+	// list of objects: ListObject, or List combined with Object rules
+	innerWrapper := rule.ListObject
+	if innerWrapper == nil && rule.List != nil && rule.Object != nil {
+		innerWrapper = rule.Object
+	}
+	if innerWrapper != nil && res != nil {
 		listRes, ok := res.([]interface{})
 		if !ok {
 			// symmetric guard for a rule carrying both Object and ListObject
@@ -295,10 +304,16 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, state *wrapperR
 		for _, xRes := range listRes {
 			if m, ok := xRes.(map[string]interface{}); ok {
 				// Validate as object with the provided child rules
+				if innerWrapper.getSetting().Strict {
+					if err := checkStrictKeys(innerWrapper, m); err != nil {
+						return nil, err
+					}
+				}
 				tmpChain := newChainer().SetKey(chainKey)
 				itemState := newWrapperRunState()
-				for keyX, ruleX := range rule.ListObject.getRules() {
-					_, err = validateRecursive(tmpChain, rule.ListObject, itemState, keyX, m, ruleX, fromJSONEncoder)
+				itemRules := innerWrapper.getRules()
+				for _, keyX := range sortedKeys(itemRules) {
+					_, err = validateRecursive(tmpChain, innerWrapper, itemState, keyX, m, itemRules[keyX], fromJSONEncoder)
 					if err != nil {
 						return nil, err
 					}
@@ -318,7 +333,7 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, state *wrapperR
 				// collect validated/manipulated item data back into the slice
 				itemMapFull := tmpChain.GetResult().ToMap()
 				filtered := make(map[string]interface{})
-				for keyAllowed := range rule.ListObject.getRules() {
+				for keyAllowed := range itemRules {
 					if val, ok := itemMapFull[keyAllowed]; ok {
 						filtered[keyAllowed] = val
 					}
@@ -336,6 +351,13 @@ func validateRecursive(pChain ChainerType, wrapper RulesWrapper, state *wrapperR
 				}
 				manipulated = append(manipulated, xRes)
 			}
+		}
+		// Min/Max on a list-of-objects rule constrain the item count
+		if rule.Min != nil && int64(len(manipulated)) < *rule.Min {
+			return nil, buildErrorMessagef(key, "should be or greater than %v", *rule.Min)
+		}
+		if rule.Max != nil && int64(len(manipulated)) > *rule.Max {
+			return nil, buildErrorMessagef(key, "should be or lower than %v", *rule.Max)
 		}
 		cChain.SetValue(manipulated)
 	}
@@ -401,7 +423,9 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 		return nil, errors.New("we need '" + field + "' field")
 	} else if validator.Null && data == nil {
 		if !validator.NilIfNull && validator.IfNull != nil {
-			return validator.IfNull, nil
+			// A default value goes through the same validation as any other
+			// value — an invalid default is a rule error, not a silent bypass.
+			return validateValueInternal(validator.IfNull, validator, dataFrom, field)
 		}
 		return nil, nil
 	}
@@ -440,9 +464,10 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 
 	// validatorType type validation
 	dataType := reflect.TypeOf(data).Kind()
-	handleIntOnHttpJson := coercesNumbers(dataFrom) && isIntegerFamily(validator.Type) && isIntegerFamily(dataType)
+	handleIntOnHttpJson := integerCoercion(dataFrom, validator.Type, dataType)
 	customData := !(!validator.UUID &&
 		!validator.IPV4 &&
+		!validator.IPV4Network &&
 		!validator.UUIDToString &&
 		!validator.IPv4OptionalPrefix &&
 		!validator.Email &&
@@ -470,6 +495,22 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 			})
 		}
 		return nil, buildErrorMessage(field, "should be '"+validator.Type.String()+"'")
+	}
+
+	// Integer rules must reject fractional values from coerced sources (JSON
+	// and forms decode numbers loosely). Integral floats still pass, so
+	// {"qty": 2} binds fine while {"qty": 2.5} fails here instead of at Bind.
+	if handleIntOnHttpJson && isIntegerKind(validator.Type) && (dataType == reflect.Float32 || dataType == reflect.Float64) {
+		if num := numericAsFloat64(data); num != math.Trunc(num) {
+			if validator.CustomMsg.OnTypeNotMatch != nil {
+				return nil, buildMessage(*validator.CustomMsg.OnTypeNotMatch, MessageMeta{
+					Field:        &field,
+					ExpectedType: &validator.Type,
+					ActualType:   &dataType,
+				})
+			}
+			return nil, buildErrorMessage(field, "should be '"+validator.Type.String()+"'")
+		}
 	}
 
 	// Early list handling to avoid container-level regex/enum/type checks
@@ -527,7 +568,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 								return nil, buildMessage(*validator.CustomMsg.OnMin, MessageMeta{
 									Field:             &field,
 									ExpectedMinLength: elementMinPtr,
-									ActualLength:      &actualLen,
+									ActualLength:      anyPtr(actualLen),
 								})
 							}
 							return nil, buildErrorMessagef(field, "should be or greater than %v", *elementMinPtr)
@@ -540,7 +581,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 								return nil, buildMessage(*validator.CustomMsg.OnMax, MessageMeta{
 									Field:             &field,
 									ExpectedMaxLength: elementMaxPtr,
-									ActualLength:      &actualLen,
+									ActualLength:      anyPtr(actualLen),
 								})
 							}
 							return nil, buildErrorMessagef(field, "should be or lower than %v", *elementMaxPtr)
@@ -557,7 +598,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 							return nil, buildMessage(*validator.CustomMsg.OnMin, MessageMeta{
 								Field:             &field,
 								ExpectedMinLength: elementMinPtr,
-								ActualLength:      &actualLen,
+								ActualLength:      anyPtr(actualLen),
 							})
 						}
 						return nil, buildErrorMessagef(field, "should be or greater than %v", *elementMinPtr)
@@ -568,7 +609,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 							return nil, buildMessage(*validator.CustomMsg.OnMax, MessageMeta{
 								Field:             &field,
 								ExpectedMaxLength: elementMaxPtr,
-								ActualLength:      &actualLen,
+								ActualLength:      anyPtr(actualLen),
 							})
 						}
 						return nil, buildErrorMessagef(field, "should be or lower than %v", *elementMaxPtr)
@@ -580,7 +621,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 			if it != nil && tmpRule.Type != reflect.Invalid {
 				gotKind := reflect.TypeOf(it).Kind()
 				expectedKind := tmpRule.Type
-				allowIntCoerce := coercesNumbers(dataFrom) && isIntegerFamily(expectedKind) && isIntegerFamily(gotKind)
+				allowIntCoerce := integerCoercion(dataFrom, expectedKind, gotKind)
 				if gotKind != expectedKind && !allowIntCoerce {
 					// Map kind to human-friendly noun (e.g., int/uint/float -> integer)
 					noun := expectedKind.String()
@@ -632,6 +673,10 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 		return data, nil
 	}
 
+	// Format checks below may convert `result` (e.g. UUID → uuid.UUID) but
+	// never return early, so Min/Max keep applying to the original value.
+	result := data
+
 	if validator.RegexString != "" {
 		if dataType != reflect.String {
 			if validator.CustomMsg.OnRegexString != nil {
@@ -650,83 +695,12 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 			}
 			return nil, buildErrorMessage(field, "is not valid regex")
 		}
-		return data, nil
-	}
-
-	// Helper function to build enum error message with custom or default text
-	buildEnumErrorMessage := func(enumValues interface{}, enumType reflect.Type, actualType reflect.Kind) error {
-		if validator.CustomMsg.OnEnumValueNotMatch != nil {
-			expectedType := enumType.Elem().Kind()
-			actualValue := fmt.Sprintf("%v", data)
-			enumValuesStr := fmt.Sprintf("%v", enumValues)
-			return buildMessage(*validator.CustomMsg.OnEnumValueNotMatch, MessageMeta{
-				Field:        &field,
-				ExpectedType: &expectedType,
-				ActualType:   &actualType,
-				ActualValue:  &actualValue,
-				EnumValues:   &enumValuesStr,
-			})
-		}
-		return buildErrorMessagef(field, "value is not in enum list%v", enumValues)
 	}
 
 	if validator.Enum != nil {
-		enumType := reflect.TypeOf(validator.Enum.Items)
-		if enumType.Kind() == reflect.Slice {
-			enumValue := reflect.ValueOf(validator.Enum.Items)
-			elemKind := enumType.Elem().Kind()
-
-			// Integer-family enums accept any integer-family value regardless of
-			// concrete or named type, from any source (map, JSON, form). Values
-			// are compared numerically so int64(2) matches IntEnum(1,2,3).
-			if isIntegerFamily(elemKind) && isIntegerFamily(dataType) {
-				dataNum := numericAsFloat64(data)
-				isFloatEnum := elemKind == reflect.Float32 || elemKind == reflect.Float64
-				// an integer enum cannot match a fractional value
-				if !isFloatEnum && dataNum != float64(int64(dataNum)) {
-					return nil, buildErrorMessage(field, "should be '"+elemKind.String()+"'")
-				}
-				var matched bool
-				for i := 0; i < enumValue.Len(); i++ {
-					if numericAsFloat64(enumValue.Index(i).Interface()) == dataNum {
-						matched = true
-						break
-					}
-				}
-				if !matched {
-					return nil, buildEnumErrorMessage(validator.Enum.Items, enumType, dataType)
-				}
-				return data, nil
-			}
-
-			if dataType != elemKind {
-				// Use custom message for type mismatch if available, otherwise use custom enum message or default
-				if validator.CustomMsg.OnTypeNotMatch != nil {
-					expectedType := elemKind
-					return nil, buildMessage(*validator.CustomMsg.OnTypeNotMatch, MessageMeta{
-						Field:        &field,
-						ExpectedType: &expectedType,
-						ActualType:   &dataType,
-					})
-				}
-				return nil, buildEnumErrorMessage(validator.Enum.Items, enumType, dataType)
-			}
-
-			switch dataType {
-			case reflect.String:
-				var values []string
-				for i := 0; i < enumValue.Len(); i++ {
-					values = append(values, enumValue.Index(i).String())
-				}
-				strData, _ := asString(data)
-				if !valueInList[string](values, strData, isEqualString) {
-					return nil, buildEnumErrorMessage(values, enumType, dataType)
-				}
-			default:
-				return nil, buildErrorMessagef(field, "enum is not supported for type '%s'", dataType.String())
-			}
+		if err := validateEnumValue(data, dataType, validator, field); err != nil {
+			return nil, err
 		}
-		return data, nil
 	}
 
 	if validator.UUIDToString {
@@ -735,7 +709,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 
 	if validator.UUID {
 		errMsg := buildErrorMessage(field, "is not valid uuid")
-		stringUuid, ok := data.(string)
+		stringUuid, ok := asString(data)
 		if !ok {
 			return nil, errMsg
 		}
@@ -744,9 +718,10 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 			return nil, errMsg
 		}
 		if validator.UUIDToString {
-			return stringUuid, nil
+			result = stringUuid
+		} else {
+			result = dataUuid
 		}
-		return dataUuid, nil
 	}
 
 	if validator.Email {
@@ -758,46 +733,42 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 
 	if validator.IPV4 {
 		errMsg := buildErrorMessage(field, "is not valid IP")
-		stringIp, ok := data.(string)
+		stringIp, ok := asString(data)
 		if !ok {
 			return nil, errMsg
 		}
 		if !isIPv4Valid(stringIp) {
 			return nil, errMsg
 		}
-		return stringIp, nil
+		result = stringIp
 	}
 
 	if validator.IPV4Network {
 		errMsg := buildErrorMessage(field, "is not valid IP Network")
-		stringIp, ok := data.(string)
+		stringIp, ok := asString(data)
 		if !ok {
 			return nil, errMsg
 		}
 		if !isIPv4NetworkValid(stringIp) {
 			return nil, errMsg
 		}
-		return stringIp, nil
+		result = stringIp
 	}
 
 	if validator.IPv4OptionalPrefix {
 		errMsg := buildErrorMessage(field, "is not valid IP")
-		stringIp, ok := data.(string)
+		stringIp, ok := asString(data)
 		if !ok {
 			return nil, errMsg
 		}
 		splitIp := strings.Split(stringIp, "/")
 		if len(splitIp) > 2 {
 			return nil, errMsg
-		} else if len(splitIp) == 1 {
-			if !isIPv4Valid(splitIp[0]) {
-				return nil, errMsg
-			}
-			return stringIp, nil
-		} else if len(splitIp) == 2 {
-			if !isIPv4Valid(splitIp[0]) {
-				return nil, errMsg
-			}
+		}
+		if !isIPv4Valid(splitIp[0]) {
+			return nil, errMsg
+		}
+		if len(splitIp) == 2 {
 			prefix, err := strconv.Atoi(splitIp[1])
 			if err != nil {
 				return nil, errMsg
@@ -805,15 +776,8 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 			if prefix < 0 || prefix > 32 {
 				return nil, errMsg
 			}
-			return stringIp, nil
-		} else if len(stringIp) == 0 {
-			return stringIp, nil
 		}
-		return nil, errMsg
-	}
-
-	if !validator.Null && reflect.TypeOf(data).Kind() == reflect.Bool && data == nil {
-		return false, nil
+		result = stringIp
 	}
 
 	// legacy ListObject fallback occurs via early list handling
@@ -834,7 +798,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 
 	if validator.Min != nil && data != nil {
 		var isErr bool
-		var actualLength int64
+		var actualLength interface{}
 		err := buildErrorMessagef(field, "should be or greater than %v", *validator.Min)
 		if reflect.String == dataType {
 			strData, _ := asString(data)
@@ -856,7 +820,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 				u := reflect.ValueOf(data).Uint()
 				if *validator.Min >= 0 && u < uint64(*validator.Min) {
 					isErr = true
-					actualLength = int64(u)
+					actualLength = u
 				}
 			default:
 				num := extractInteger(data)
@@ -878,7 +842,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 				return nil, buildMessage(*validator.CustomMsg.OnMin, MessageMeta{
 					Field:             &field,
 					ExpectedMinLength: SetTotal(*validator.Min),
-					ActualLength:      SetTotal(actualLength),
+					ActualLength:      anyPtr(actualLength),
 				})
 			}
 			return nil, err
@@ -887,7 +851,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 
 	if validator.Max != nil && data != nil {
 		var isErr bool
-		var actualLength int64
+		var actualLength interface{}
 		err := buildErrorMessagef(field, "should be or lower than %v", *validator.Max)
 		if reflect.String == dataType {
 			strData, _ := asString(data)
@@ -909,7 +873,7 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 				u := reflect.ValueOf(data).Uint()
 				if *validator.Max < 0 || u > uint64(*validator.Max) {
 					isErr = true
-					actualLength = int64(u)
+					actualLength = u
 				}
 			default:
 				num := extractInteger(data)
@@ -931,14 +895,94 @@ func validateValueInternal(data interface{}, validator Rules, dataFrom loadFromT
 				return nil, buildMessage(*validator.CustomMsg.OnMax, MessageMeta{
 					Field:             &field,
 					ExpectedMaxLength: SetTotal(*validator.Max),
-					ActualLength:      SetTotal(actualLength),
+					ActualLength:      anyPtr(actualLength),
 				})
 			}
 			return nil, err
 		}
 	}
 
-	return data, nil
+	return result, nil
+}
+
+// validateEnumValue checks `data` against the rule's Enum configuration.
+// A misconfigured enum (nil or non-slice Items) is a rule error — it used to
+// silently disable the enum check (or panic on nil Items).
+func validateEnumValue(data interface{}, dataType reflect.Kind, validator Rules, field string) error {
+	// build enum error message with custom or default text
+	buildEnumErrorMessage := func(enumValues interface{}, enumType reflect.Type, actualType reflect.Kind) error {
+		if validator.CustomMsg.OnEnumValueNotMatch != nil {
+			expectedType := enumType.Elem().Kind()
+			actualValue := fmt.Sprintf("%v", data)
+			enumValuesStr := fmt.Sprintf("%v", enumValues)
+			return buildMessage(*validator.CustomMsg.OnEnumValueNotMatch, MessageMeta{
+				Field:        &field,
+				ExpectedType: &expectedType,
+				ActualType:   &actualType,
+				ActualValue:  &actualValue,
+				EnumValues:   &enumValuesStr,
+			})
+		}
+		return buildErrorMessagef(field, "value is not in enum list%v", enumValues)
+	}
+
+	enumType := reflect.TypeOf(validator.Enum.Items)
+	if enumType == nil || enumType.Kind() != reflect.Slice {
+		return buildErrorMessage(field, "has an invalid enum configuration: items must be a slice")
+	}
+	enumValue := reflect.ValueOf(validator.Enum.Items)
+	elemKind := enumType.Elem().Kind()
+
+	// Integer-family enums accept any integer-family value regardless of
+	// concrete or named type, from any source (map, JSON, form). Values
+	// are compared numerically so int64(2) matches IntEnum(1,2,3).
+	if isIntegerFamily(elemKind) && isIntegerFamily(dataType) {
+		dataNum := numericAsFloat64(data)
+		isFloatEnum := elemKind == reflect.Float32 || elemKind == reflect.Float64
+		// an integer enum cannot match a fractional value
+		if !isFloatEnum && dataNum != float64(int64(dataNum)) {
+			return buildErrorMessage(field, "should be '"+elemKind.String()+"'")
+		}
+		var matched bool
+		for i := 0; i < enumValue.Len(); i++ {
+			if numericAsFloat64(enumValue.Index(i).Interface()) == dataNum {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return buildEnumErrorMessage(validator.Enum.Items, enumType, dataType)
+		}
+		return nil
+	}
+
+	if dataType != elemKind {
+		// Use custom message for type mismatch if available, otherwise use custom enum message or default
+		if validator.CustomMsg.OnTypeNotMatch != nil {
+			expectedType := elemKind
+			return buildMessage(*validator.CustomMsg.OnTypeNotMatch, MessageMeta{
+				Field:        &field,
+				ExpectedType: &expectedType,
+				ActualType:   &dataType,
+			})
+		}
+		return buildEnumErrorMessage(validator.Enum.Items, enumType, dataType)
+	}
+
+	switch dataType {
+	case reflect.String:
+		var values []string
+		for i := 0; i < enumValue.Len(); i++ {
+			values = append(values, enumValue.Index(i).String())
+		}
+		strData, _ := asString(data)
+		if !valueInList[string](values, strData, isEqualString) {
+			return buildEnumErrorMessage(values, enumType, dataType)
+		}
+	default:
+		return buildErrorMessagef(field, "enum is not supported for type '%s'", dataType.String())
+	}
+	return nil
 }
 
 func SetTotal(total int64) *int64 {
@@ -946,6 +990,10 @@ func SetTotal(total int64) *int64 {
 }
 
 func SetMessage(msg string) *string { return &msg }
+
+// anyPtr boxes a value into *interface{} for MessageMeta length fields that may
+// hold int64 or uint64, so huge uint64 values format without int64 overflow.
+func anyPtr(v interface{}) *interface{} { return &v }
 
 func toInterfaceSlice(slice interface{}) ([]interface{}, bool) {
 
@@ -974,10 +1022,15 @@ func toMapStringInterface(data interface{}) (map[string]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = json.NewDecoder(ioData).Decode(&res)
+	decoder := json.NewDecoder(ioData)
+	// UseNumber keeps integer literals beyond float64's exact range intact;
+	// normalizeJSONNumbers then restores plain Go types.
+	decoder.UseNumber()
+	err = decoder.Decode(&res)
 	if err != nil {
 		return nil, err
 	}
+	normalizeJSONNumbers(res)
 	return res, nil
 }
 
@@ -1034,182 +1087,75 @@ func isUintKind(k reflect.Kind) bool {
 	return false
 }
 
-func convertValue(newValue interface{}, kind reflect.Kind, data reflect.Value, pointer bool) error {
-	errNotSupport := errors.New("not support data")
-	switch kind {
-	case reflect.Int:
-		converted, ok := newValue.(float64)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetInt(int64(converted))
-		}
-	case reflect.Int8:
-		converted, ok := newValue.(int64)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetInt(converted)
-		}
-	case reflect.Int16:
-		converted, ok := newValue.(int64)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetInt(converted)
-		}
-	case reflect.Int32:
-		converted, ok := newValue.(int64)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetInt(converted)
-		}
-	case reflect.Int64:
-		converted, ok := newValue.(int64)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetInt(converted)
-		}
-	case reflect.Uint:
-		converted, ok := newValue.(float64)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetUint(uint64(converted))
-		}
-	case reflect.Uint8:
-		converted, ok := newValue.(float64)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetUint(uint64(converted))
-		}
-	case reflect.Uint16:
-		converted, ok := newValue.(float64)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetUint(uint64(converted))
-		}
-	case reflect.Uint32:
-		converted, ok := newValue.(float64)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetUint(uint64(converted))
-		}
-	case reflect.Uint64:
-		converted, ok := newValue.(float64)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetUint(uint64(converted))
-		}
-	case reflect.Float32:
-		converted, ok := newValue.(float64)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetFloat(float64(converted))
-		}
-	case reflect.Float64:
-		converted, ok := newValue.(float64)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetFloat(converted)
-		}
-	case reflect.String:
-		converted, ok := newValue.(string)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetString(converted)
-		}
-	case reflect.Bool:
-		converted, ok := newValue.(bool)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetBool(converted)
-		}
-	case reflect.Complex64:
-		converted, ok := newValue.(complex128)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetComplex(complex128(complex64(converted)))
-		}
-	case reflect.Complex128:
-		converted, ok := newValue.(complex128)
-		if !ok {
-			return errNotSupport
-		}
-		if pointer {
-			data.Set(reflect.ValueOf(&converted))
-		} else {
-			data.SetComplex(converted)
-		}
-	case reflect.Interface:
-		data.Set(reflect.ValueOf(newValue))
-	default:
-		return errNotSupport
-	}
-	return nil
-}
-
 func getAllKeys(data map[string]interface{}) (allKeysInMap []string) {
 	for key, _ := range data {
 		allKeysInMap = append(allKeysInMap, key)
 	}
 	return
+}
+
+// maxExactFloatInt64 is the largest magnitude int64 that float64 represents
+// exactly (2^53). Integer values beyond it lose precision through float64.
+const maxExactFloatInt64 = int64(1) << 53
+
+// sortedKeys returns the rule keys in deterministic order so validation — and
+// therefore "the first error" — no longer depends on Go's randomized map
+// iteration.
+func sortedKeys(m map[string]Rules) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// checkStrictKeys rejects payload keys that have no matching rule at this
+// object level.
+func checkStrictKeys(wrapper RulesWrapper, data map[string]interface{}) error {
+	allowed := make([]string, 0, len(wrapper.getRules()))
+	for k := range wrapper.getRules() {
+		allowed = append(allowed, k)
+	}
+	keys := getAllKeys(data)
+	sort.Strings(keys)
+	for _, k := range keys {
+		if !isDataInList(k, allowed) {
+			return fmt.Errorf("'%s' is not allowed key", k)
+		}
+	}
+	return nil
+}
+
+// normalizeJSONNumbers converts json.Number values (produced by decoders with
+// UseNumber) back into plain Go numbers. Integers within float64's exact range
+// become float64 — matching the legacy encoding/json behavior — while larger
+// integers stay int64 so IDs like 9007199254740993 are never corrupted.
+func normalizeJSONNumbers(v interface{}) interface{} {
+	switch t := v.(type) {
+	case map[string]interface{}:
+		for k, val := range t {
+			t[k] = normalizeJSONNumbers(val)
+		}
+		return t
+	case []interface{}:
+		for i, val := range t {
+			t[i] = normalizeJSONNumbers(val)
+		}
+		return t
+	case json.Number:
+		if i, err := strconv.ParseInt(string(t), 10, 64); err == nil {
+			if i > maxExactFloatInt64 || i < -maxExactFloatInt64 {
+				return i
+			}
+			return float64(i)
+		}
+		if f, err := strconv.ParseFloat(string(t), 64); err == nil {
+			return f
+		}
+		return string(t)
+	}
+	return v
 }
 
 func isDataInList[T validatorType](key T, data []T) (result bool) {
@@ -1229,9 +1175,22 @@ func coercesNumbers(dataFrom loadFromType) bool {
 	return dataFrom == fromHttpJson || dataFrom == fromJSONEncoder || dataFrom == fromHttpMultipartForm
 }
 
+// integerCoercion reports whether an integer rule should accept the given
+// actual kind. JSON/form sources decode all numbers as float64, so integer
+// rules there tolerate any integer-family kind (including float). Map sources
+// keep exact types, so only integer kinds (int/int64/uint/...) cross-coerce —
+// a float for an int rule is still rejected.
+func integerCoercion(dataFrom loadFromType, expected, actual reflect.Kind) bool {
+	if coercesNumbers(dataFrom) && isIntegerFamily(expected) && isIntegerFamily(actual) {
+		return true
+	}
+	return dataFrom == fromMapString && isIntegerKind(expected) && isIntegerKind(actual)
+}
+
 // coerceFormValue normalizes a raw form string into the JSON-like primitive the
 // validator expects for the declared kind: numbers become float64 (matching the
-// JSON decoder), booleans become bool. On parse failure the raw string is
+// JSON decoder), booleans become bool. Integers beyond float64's exact range
+// stay int64 so they do not lose precision. On parse failure the raw string is
 // returned so the normal type check reports a clear "should be 'int'" error.
 func coerceFormValue(value string, kind reflect.Kind) interface{} {
 	switch {
@@ -1240,6 +1199,12 @@ func coerceFormValue(value string, kind reflect.Kind) interface{} {
 			return b
 		}
 	case isIntegerFamily(kind):
+		if i, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if i > maxExactFloatInt64 || i < -maxExactFloatInt64 {
+				return i
+			}
+			return float64(i)
+		}
 		if f, err := strconv.ParseFloat(value, 64); err == nil {
 			return f
 		}
@@ -1253,6 +1218,19 @@ func isIntegerFamily(dataType reflect.Kind) bool {
 		reflect.Int32, reflect.Int64, reflect.Uint,
 		reflect.Uint8, reflect.Uint16, reflect.Uint32,
 		reflect.Uint64, reflect.Float32, reflect.Float64:
+		return true
+	}
+	return false
+}
+
+// isIntegerKind is the integer-family predicate WITHOUT floats: true only for
+// the signed/unsigned integer kinds. Used for map-source cross-coercion where
+// floats must keep their exact (float64) type check.
+func isIntegerKind(dataType reflect.Kind) bool {
+	switch dataType {
+	case reflect.Int, reflect.Int8, reflect.Int16,
+		reflect.Int32, reflect.Int64, reflect.Uint,
+		reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		return true
 	}
 	return false

@@ -5,6 +5,69 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to incremental patch versioning (`v0.0.x`).
 
+## [v0.0.48]
+
+A bug-fix release fixing 13 defects found by a probe-based audit: silent
+non-enforcement (validation that quietly did nothing), silent data corruption
+(large JSON integers), and misleading errors. No public API changes — but two
+behavior changes are visible, see Migration notes.
+
+### Fixed
+
+- **Default (`IfNull`) values are now validated.** `StrEnum("a","b").Default("zzz")` and `Int().Default("hello")` used to pass validation with the invalid default applied. Defaults now go through the same checks as payload values.
+- **Misconfigured enums are rejected.** `Enum` with nil or non-slice `Items` silently disabled the enum check (any value passed), and nil `Items` could panic. Both now return a validation error.
+- **`RequiredWithout` / `RequiredIf` no longer no-op when the dependency has no rule.** The check only inspected declared fields, so a dependency referenced by name but never declared was never evaluated. Dependencies are now checked against the payload itself; declared-dependency behavior is unchanged.
+- **JSON integers beyond 2^53 are no longer corrupted.** `{"id": 9007199254740993}` validated and bound as `9007199254740992` — silently wrong. `LoadJsonHttp` now decodes with `json.Number` and keeps integers outside float64's exact range as `int64` end-to-end (nested objects included). Integers within the exact range still decode as `float64` (unchanged).
+- **`Rules{IPV4Network: true}` works without an explicit `Type`.** It was missing from the flag list that exempts string-content rules from the kind check, so any value failed with `"should be 'invalid'"`.
+- **IPv4 rules reject IPv4-mapped IPv6 strings.** `IPv4()` and `IPV4Network` accepted `"::ffff:1.2.3.4"` because `net.ParseIP(...).To4()` is non-nil for mapped addresses. Only dotted-quad input passes now.
+- **`Min`/`Max` constrain the item count of `ListObject` rules.** They were silently ignored — the `ListObject` path returned before the container checks.
+- **`Min`/`Max` apply to format rules.** `UUID()`, `IPv4()`, `StrEnum`/`IntEnum`, and `.Regex()` short-circuited before the Min/Max checks, so chained bounds were ignored — while `Email()` enforced them. All format rules now enforce Min/Max on the original value (string length for string formats, numeric for integer enums).
+- **`Bind` works with multipart files.** `FileRequest` cannot survive a JSON round-trip, so binding a validated multipart payload always failed with an unmarshal error. Files are now carried around the round-trip and injected into matching struct fields (by `json` tag or field name), preserving the open handle and file metadata.
+- **Fractional numbers fail integer rules at validation time.** `{"qty": 2.5}` used to pass an `Int()` rule from JSON and blow up at `Bind` with a raw json error. Integral floats still pass; fractional ones now report `should be 'int'` (consistent with `IntEnum` and with map sources).
+- **A nil payload or a literal `null` body behaves like an empty payload.** Both previously surfaced as `"no data to Validate because last progress is error"`.
+- **`List(NestedObject(w))` is now supported.** It used to fail with the misleading `"is not valid object"`; it now validates items exactly like `ListOfObject(w)`, including item-level manipulators, uniqueness, and container `Min`/`Max`.
+- **The first reported error is deterministic.** Rule keys are validated in sorted order (root, nested objects, and list items), so a payload with several invalid fields always reports the same error instead of a map-iteration random one. Strict-mode unknown-key errors are now reported before field errors, deterministically.
+
+### Internal
+
+- `LoadJsonHttp` and `toMapStringInterface` decode with `UseNumber()`; `normalizeJSONNumbers` restores plain Go types (int64 outside float64's exact range).
+- `coerceFormValue` keeps large form integers as `int64` instead of rounding through float64.
+- Strict-mode key checking moved out of the per-field path (it ran once per rule key) into one check per object scope — O(n) instead of O(n²).
+- Removed an unreachable branch in `IPv4OptionalPrefix`.
+- `TestIntFamily` now asserts that fractional floats are rejected for integer rules (it previously asserted the lenient behavior).
+- 13 regression tests in `test/bugfix_v0048_test.go`.
+
+### Migration notes
+
+- No API changes. Most fixes only make previously-wrong flows fail (or previously-failing flows work), but two behavior changes are visible:
+  - **Error ordering is now deterministic** (sorted keys, strict-mode first). If you match on which of several possible errors came back, you may see a different — now stable — error.
+  - **`Min`/`Max` on format rules and `ListObject` are now enforced.** Rules that chained `WithMin`/`WithMax`/`Between` onto `UUID()` / `IPv4()` / enums / regex / `ListObject` previously ignored those bounds; they now take effect and can start rejecting payloads.
+- `Any()` + explicit `null` continues to be rejected (required means non-null); use `.Nullable()` for null-tolerant passthrough.
+
+## [v0.0.47]
+
+A bug-fix release. No public API additions. Four non-breaking fixes: two
+correctness fixes (integer coercion from maps, `uint64` message overflow), one
+defensive guard, and dead-code cleanup.
+
+### Fixed
+
+- **Integer rules now coerce sibling integer kinds from `Load(map)`.** `Int()` / `Int64()` rejected values such as `int64`, `int32`, `uint`, or `uint64` coming from plain Go maps, reporting `"should be 'int'"` even though the value was a valid integer. This was inconsistent with JSON/form sources (which decode numbers as `float64`) and with `IntEnum`. Integer kinds now cross-coerce from map sources; **floats are still rejected** for integer rules from maps (integer-only coercion — no float→int loosening).
+- **`uint64` values in `${actual_length}` no longer wrap negative.** A huge `uint64` above `math.MaxInt64` shown through a custom Min/Max message displayed as a negative number (e.g. `-9223372036854775709`). The message now reports the correct unsigned value.
+- **`GetData()` no longer panics on a nil-data state.** Calling `GetData()` on a zero-value `ExtraOperationData` dereferenced a nil pointer; it now returns an empty map, consistent with `GetFilledField()` / `GetNullField()`.
+
+### Internal
+
+- New helpers: `isIntegerKind` (integer kinds without floats) and `integerCoercion` (the shared JSON-vs-map coercion decision).
+- `MessageMeta.ActualLength` widened from `*int64` to `*interface{}` so Min/Max messages can carry either signed or unsigned lengths.
+- Removed dead code: `isEqualInt` / `isEqualInt64` / `isEqualFloat64`, the unused `convertValue` function, and an unreachable boolean branch.
+- Added regression tests in `test/bugfix_v0047_test.go` (5 tests, one table-driven).
+
+### Migration notes
+
+- No code changes required for existing callers.
+- `Int()` / `Int64()` rules now accept integer-kind values (e.g. `int64`, `uint`) from `Load(map)` that previously errored — this only makes previously-rejected payloads pass, so it is non-breaking.
+
 ## [v0.0.46]
 
 A bug-fix release. No public API additions. Ten defects fixed across two
