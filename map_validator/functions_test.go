@@ -271,8 +271,11 @@ func TestIntFamily(t *testing.T) {
 			Type: reflect.Int,
 		}, fromHttpJson,
 	)
-	if err != nil {
-		t.Errorf("Test case 1 Error : %v", err)
+	// fractional values are rejected for integer rules — coercion only covers
+	// whole numbers (consistent with IntEnum and with map sources)
+	expected := "the field 'power' should be 'int'"
+	if err == nil || err.Error() != expected {
+		t.Errorf("Expected : %s But you got : %v", expected, err)
 	}
 
 	payload = map[string]interface{}{"power": 133.3, "harga": 1.3}
@@ -281,8 +284,19 @@ func TestIntFamily(t *testing.T) {
 			Type: reflect.Int16,
 		}, fromHttpJson,
 	)
+	expected = "the field 'power' should be 'int16'"
+	if err == nil || err.Error() != expected {
+		t.Errorf("Expected : %s But you got : %v", expected, err)
+	}
+
+	payload = map[string]interface{}{"power": 133, "harga": 1.3}
+	_, err = validate(
+		"power", payload, Rules{
+			Type: reflect.Int16,
+		}, fromHttpJson,
+	)
 	if err != nil {
-		t.Errorf("Test case 1 Error : %v", err)
+		t.Errorf("Test case int16 whole number Error : %v", err)
 	}
 
 	payload = map[string]interface{}{"power": "133.3", "harga": 1.3}
@@ -291,7 +305,7 @@ func TestIntFamily(t *testing.T) {
 			Type: reflect.Int16,
 		}, fromHttpJson,
 	)
-	expected := "the field 'power' should be 'int'"
+	expected = "the field 'power' should be 'int'"
 	if err.Error() != expected {
 		t.Errorf("Expected : %s But you got : %s", expected, err)
 	}

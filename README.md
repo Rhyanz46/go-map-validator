@@ -66,6 +66,18 @@ _ = result.Bind(&dto2)
 - **`List(elem)` and `Any()`** — primitive list helper and passthrough escape hatch for fields that should survive whitelist binding.
 - **Safe for shared & concurrent use** — rules no longer hold per-call state, so a single `rules` value can be declared as a package-level var and reused across handlers and goroutines.
 
+## What's new in v0.0.48
+
+A bug-fix release: 13 defects fixed, no API changes. Highlights:
+
+- **Silent non-enforcement fixed**: `IfNull`/`Default` values are now validated; misconfigured `Enum` items are rejected instead of disabling the check; `RequiredWithout`/`RequiredIf` work even when the dependency field has no rule; `Min`/`Max` on `ListObject` and on format rules (`UUID()`, `IPv4()`, enums, `.Regex()`) are now enforced.
+- **No more silent corruption**: JSON integers beyond 2^53 (e.g. `9007199254740993`) now survive to `Bind` exactly instead of rounding through `float64`; fractional values like `2.5` fail an `Int()` rule at validation instead of at `Bind`.
+- **`Bind` supports multipart files**: `FileRequest` fields bind with their open file handle preserved.
+- **Deterministic errors**: the first error for a given payload is now stable — rule keys are validated in sorted order and strict-mode is checked first.
+- **Other fixes**: `Rules{IPV4Network: true}` works without `Type`; IPv4 rules reject `::ffff:x.x.x.x` mapped strings; `List(NestedObject(w))` is supported; a nil payload / `null` body behaves as an empty payload.
+
+See [CHANGELOG.md](CHANGELOG.md) for the full list and migration notes.
+
 ## What's new in v0.0.47
 
 A small non-breaking bug-fix release.
@@ -418,7 +430,7 @@ Set `Setting{Strict:true}` in a rules group to reject any unknown keys at that o
 - JSON numbers decode as `float64`. Integer-family kinds are tolerated on JSON input.
 - `LoadFormHttp`: non-file values arrive as strings; there is no automatic string→int/float/bool parsing. Use a manipulator or extension to convert.
 - Email validation is simple (checks `@` and `.`), not full RFC compliance.
-- Error reporting returns the first encountered error (no multi-error aggregation with field paths yet).
+- Error reporting returns the first encountered error (no multi-error aggregation with field paths yet). Evaluation order is deterministic: rule keys are validated in sorted order and strict-mode unknown-key errors are reported first.
 - Custom messages are not yet available for: null errors and specific `RequiredWithout` / `RequiredIf` messages.
 - Empty rules no longer panic. `SetRules` accepts them silently; the subsequent `Load` / `LoadJsonHttp` / `LoadFormHttp` returns `ErrNoRules` so callers can handle it uniformly.
 
